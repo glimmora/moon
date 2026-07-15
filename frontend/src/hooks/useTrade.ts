@@ -30,10 +30,22 @@ export function useTrade({ chainId, curveAddress }: UseTradeArgs) {
       setError("Connect wallet first.");
       return;
     }
+    // AUDIT-FIX I-2: Validate the input before calling parseEther — empty / non-numeric
+    // strings used to throw an uncaught TypeError that bubbled up as "Unknown error".
+    const trimmed = quoteAmountIn.trim();
+    if (!trimmed || !/^\d*\.?\d+$/.test(trimmed)) {
+      setError("Enter a valid amount.");
+      return;
+    }
     setError(null);
     setPending(true);
     try {
-      const value = parseEther(quoteAmountIn);
+      const value = parseEther(trimmed);
+      if (value <= 0n) {
+        setError("Amount must be greater than 0.");
+        setPending(false);
+        return;
+      }
       const hash = await writeContractAsync({
         abi: bondingCurveAbi,
         address: curveAddress,

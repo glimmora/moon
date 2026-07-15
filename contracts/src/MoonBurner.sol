@@ -18,7 +18,7 @@ contract MoonBurner is AccessControl, Pausable, IMoonBurner {
     using SafeERC20 for IERC20;
 
     /* ───────────────────────  Errors  ────────────────────────── */
-    error ZeroAddress();
+    // AUDIT-FIX L-1: ZeroAddress is now declared in IMoonBurner (interface).
 
     /* ───────────────────────  Roles  ──────────────────────────── */
 
@@ -103,10 +103,17 @@ contract MoonBurner is AccessControl, Pausable, IMoonBurner {
         ) returns (uint256[] memory amounts) {
             moonBought = amounts[amounts.length - 1];
         } catch {
+            // AUDIT-FIX M-3: Refund native to treasury on swap failure + emit event so the
+            // failure is observable off-chain. The prior `ok;` statement was dead code.
             if (quoteAsset == address(0)) {
-                // Refund native to treasury on failure.
-                (bool ok,) = payable(treasury).call{value: quoteAmount}("");
-                ok;
+                (bool refundOk,) = payable(treasury).call{value: quoteAmount}("");
+                if (!refundOk) {
+                    emit BuybackSkipped(quoteAmount, "native refund failed");
+                } else {
+                    emit BuybackSkipped(quoteAmount, "swap failed - native refunded");
+                }
+            } else {
+                emit BuybackSkipped(quoteAmount, "swap failed");
             }
             moonBought = 0;
         }
@@ -135,9 +142,11 @@ contract MoonBurner is AccessControl, Pausable, IMoonBurner {
     }
 
     /// @inheritdoc IMoonBurner
+    /// @dev AUDIT-FIX L-1: `to == address(0)` now reverts with ZeroAddress (was ZeroAmount).
     function rescue(address token, address to, uint256 amount) external override onlyRole(ADMIN_ROLE) {
         if (token == moonToken) revert RescueBlocked();
-        if (to == address(0)) revert ZeroAmount();
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
         if (token == address(0)) {
             (bool ok,) = payable(to).call{value: amount}("");
             require(ok, "transfer failed");

@@ -11,6 +11,7 @@ interface IMoonBurner {
     error NotAuthorized();
     error BurnerPaused();
     error ZeroAmount();
+    error ZeroAddress(); // AUDIT-FIX L-1
     error RescueBlocked();
 
     /* ─────────────────────────  Events  ───────────────────────── */

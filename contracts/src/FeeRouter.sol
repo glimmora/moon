@@ -19,6 +19,7 @@ contract FeeRouter is AccessControl, ReentrancyGuard, IFeeRouter {
 
     /* ───────────────────────  Errors  ────────────────────────── */
     error ZeroAddress();
+    error PushFailed(); // AUDIT-FIX L-2: surface native transfer failures
 
     /* ───────────────────────  Roles  ──────────────────────────── */
 
@@ -135,9 +136,16 @@ contract FeeRouter is AccessControl, ReentrancyGuard, IFeeRouter {
     function _send(address quoteAsset, address to, uint256 amount) internal {
         if (amount == 0 || to == address(0)) return;
         if (quoteAsset == address(0)) {
+            // AUDIT-FIX L-2: Surface native transfer failures instead of silently dropping.
+            // If the primary recipient is a contract that reverts, fall back to treasury
+            // so funds are not stuck. If treasury also fails, revert the whole distribution
+            // (the caller bonding curve will then keep the funds for retry).
             (bool ok,) = payable(to).call{value: amount}("");
             if (!ok) {
-                // Fallback: if push fails, leave funds here for rescue. Non-fatal.
+                if (to == treasury) revert PushFailed();
+                (bool retryOk,) = payable(treasury).call{value: amount}("");
+                if (!retryOk) revert PushFailed();
+                emit PushFallback(to, treasury, amount);
             }
         } else {
             IERC20(quoteAsset).safeTransfer(to, amount);

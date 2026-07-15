@@ -27,6 +27,9 @@ interface IFeeRouter {
     event MoonBurnerUpdated(address indexed oldBurner, address indexed newBurner);
     event CallerGranted(address indexed curve);
     event CallerRevoked(address indexed curve);
+    /// @dev AUDIT-FIX L-2: emitted when a native push to the original recipient failed
+    ///      and funds were routed to treasury instead.
+    event PushFallback(address indexed originalRecipient, address indexed treasury, uint256 amount);
 
     /* ─────────────────────────  Core  ─────────────────────────── */
 

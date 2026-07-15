@@ -107,6 +107,11 @@ contract MoonFactory is AccessControl, IMoonFactory {
         token = moonTokenImpl.clone();
         curve = bondingCurveImpl.clone();
 
+        // AUDIT-FIX H-1: Bootstrap the factory pointer on the new clone BEFORE __init().
+        // This removes the prior `s_factory == address(0)` auto-bootstrap path that
+        // allowed anyone to become the factory on the first call to __init().
+        BondingCurve(payable(curve)).setFactory();
+
         // Compute reserves for the tier + curve.
         uint256 totalSupplyInit = totalSupplyForTier(params.supplyTier);
         uint256 realTokenReservesInit = realReservesForTier(params.supplyTier);

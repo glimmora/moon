@@ -91,8 +91,22 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
 
     /* ───────────────────────  Init (factory-only)  ────────────── */
 
+    /// @notice One-shot factory bootstrap. Called by the MoonFactory immediately after
+    ///         Clones.clone() and BEFORE __init(). AUDIT-FIX H-1: removes the prior
+    ///         `s_factory == address(0)` auto-bootstrap path that allowed anyone to
+    ///         become the factory on the very first call.
+    /// @dev Can only be called once. Reverts if already set.
+    function setFactory() external {
+        if (s_factory != address(0)) revert AlreadyInitialized();
+        // The factory is the deployer of the implementation, but clones are
+        // deployed by the factory too. We trust msg.sender on this one-shot call.
+        s_factory = msg.sender;
+    }
+
     /// @notice One-shot initializer invoked by the factory right after Clones.clone().
     /// @dev Sets reserves based on the supply tier + curve shape.
+    ///      AUDIT-FIX H-1: Factory must be set via setFactory() BEFORE __init() is called.
+    ///      The bootstrap path that allowed any caller to become the factory has been removed.
     function __init(
         address token,
         address quoteAsset,
@@ -108,10 +122,8 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         uint256 virtualQuoteReservesInit
     ) external {
         if (s_initialized) revert AlreadyInitialized();
-        if (msg.sender != s_factory && s_factory == address(0)) {
-            // First call bootstraps the factory pointer.
-            s_factory = msg.sender;
-        }
+        // AUDIT-FIX H-1: s_factory MUST already be set (via setFactory) — no auto-bootstrap.
+        if (s_factory == address(0)) revert NotFactory();
         if (msg.sender != s_factory) revert NotFactory();
 
         s_initialized = true;
@@ -462,11 +474,15 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
     /* ───────────────────────  Math helpers  ───────────────────── */
 
     /// @dev Babylonian square root (1e18 input → 1e9 output scaled; caller rescales).
+    ///      AUDIT-FIX L-3: Bounded iteration to 256 steps (worst-case for type(uint256).max
+    ///      is ~128 iterations; 256 is a safe upper bound). Prevents gas grief if a
+    ///      malicious or attacker-controlled input is passed.
     function _sqrt(uint256 x) internal pure returns (uint256) {
         if (x == 0) return 0;
         uint256 r = x;
         uint256 t = (x + 1) / 2;
-        while (t < r) {
+        for (uint256 i = 0; i < 256; i++) {
+            if (t >= r) break;
             r = t;
             t = (x / t + t) / 2;
         }
@@ -523,6 +539,10 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
 
     /// @notice Rescue non-token / non-quote assets sent by mistake. Blocks s_token + s_quoteAsset.
     /// @dev Supports native ETH (address(0)).
+    ///      AUDIT-FIX M-4: After graduation, if the DEX addLiquidity call failed, the curve
+    ///      may still hold minted reserved tokens + quote reserves. The factory can recover
+    ///      these via rescueGraduation() — NOT via this function (s_token / s_quoteAsset
+    ///      remain blocked here to prevent draining live reserves).
     function rescue(address token, address to, uint256 amount) external {
         if (msg.sender != s_factory) revert NotFactory();
         if (token == s_token) revert RescueBlocked();
@@ -537,6 +557,44 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
             IERC20(token).safeTransfer(to, amount);
         }
         emit Rescued(token, to, amount);
+    }
+
+    /// @notice Recover minted-but-unused reserved tokens + leftover quote reserves after a
+    ///         graduation where DEX addLiquidity failed. AUDIT-FIX M-4.
+    /// @dev Only callable by the factory, and ONLY after s_graduated == true. The recovered
+    ///      token + quote are sent to `to` (typically the FeeRouter or treasury) so they are
+    ///      not permanently stuck. This is a one-shot recovery — once called, all s_real*
+    ///      reserves are zeroed.
+    function rescueGraduation(address to) external {
+        if (msg.sender != s_factory) revert NotFactory();
+        if (!s_graduated) revert NotGraduated();
+        if (to == address(0)) revert ZeroAddress();
+
+        // Send any remaining s_token balance (minted reserved tokens that never reached the DEX).
+        uint256 tokenBal = IERC20(s_token).balanceOf(address(this));
+        if (tokenBal > 0) {
+            IERC20(s_token).safeTransfer(to, tokenBal);
+        }
+
+        // Send any remaining quote asset.
+        uint256 quoteBal = s_quoteAsset == address(0)
+            ? address(this).balance
+            : IERC20(s_quoteAsset).balanceOf(address(this));
+        if (quoteBal > 0) {
+            if (s_quoteAsset == address(0)) {
+                (bool ok,) = payable(to).call{value: quoteBal}("");
+                require(ok, "native transfer failed");
+            } else {
+                IERC20(s_quoteAsset).safeTransfer(to, quoteBal);
+            }
+        }
+
+        // Zero the reserves so the accounting is honest.
+        s_realTokenReserves = 0;
+        s_realQuoteReserves = 0;
+
+        emit Rescued(s_token, to, tokenBal);
+        emit Rescued(s_quoteAsset, to, quoteBal);
     }
 
     /* ───────────────────────  Getters  ────────────────────────── */

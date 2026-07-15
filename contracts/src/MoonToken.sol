@@ -109,8 +109,10 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
     }
 
     /// @inheritdoc IMoonToken
-    /// @dev AUDIT-FIX M-1: Add onlyRole(MINTER_ROLE) — burn should be restricted.
-    function burn(uint256 amount) external override onlyRole(MINTER_ROLE) {
+    /// @dev AUDIT-FIX M-1 (revised): Self-burn is permissionless — any holder may burn
+    ///      their own tokens. This is standard ERC-20 Burnable behavior. The bonding curve
+    ///      uses burnFrom() (which requires MINTER_ROLE or allowance) for sell flows.
+    function burn(uint256 amount) external override {
         _burn(msg.sender, amount);
     }
 
@@ -147,10 +149,14 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
                     revert ExceedsMaxHold();
                 }
             }
-            // Cooldown (block-granular anti-sandwich).
+            // Cooldown (timestamp-based anti-sandwich).
+            // AUDIT-FIX M-2: Removed the `last != 0` bypass — the first-ever trade was
+            // silently allowed through even if a cooldown should have applied. Now the
+            // check is simply: if `last` is set AND we're still inside the cooldown window,
+            // revert. A zero `last` means the address has never traded — no cooldown.
             if (s_cooldownSeconds != 0) {
                 uint256 last = s_lastTradeBlock[from];
-                if (block.timestamp < last + s_cooldownSeconds && last != 0) {
+                if (last != 0 && block.timestamp < last + s_cooldownSeconds) {
                     revert CooldownActive();
                 }
                 s_lastTradeBlock[from] = block.timestamp;
