@@ -11,6 +11,7 @@ import { ArrowLeft, ExternalLink, Flame, Loader2, LineChart, Users, Share2 } fro
 import { Link } from "react-router-dom";
 import { type Address } from "viem";
 import { cn } from "@/lib/cn";
+import { LaunchCountdown } from "@/components/tokens/LaunchCountdown";
 
 export function TokenDetail() {
   const params = useParams<{ chainId: string; address: string }>();
@@ -116,6 +117,32 @@ export function TokenDetail() {
           </div>
         </div>
       </header>
+
+      {/* Graduation countdown banner */}
+      {!data.graduated && (
+        <div className="card-elevated p-4 sm:p-5 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-moon-700/10 via-pink-600/5 to-transparent pointer-events-none" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <p className="text-xs uppercase tracking-wider text-neutral-500 mb-2">Graduation Progress</p>
+              <LaunchCountdown
+                progress={Math.min(100, Math.max(2, (data.volume24h / 50) * 100))}
+                graduated={data.graduated}
+                createdAt={data.createdAt}
+                volume24h={data.volume24h}
+              />
+            </div>
+            <div className="hidden sm:block w-px h-12 bg-white/[0.08]" />
+            <div className="text-sm">
+              <p className="text-xs text-neutral-500">Threshold</p>
+              <p className="font-semibold tabular">
+                {["793.1M", "7.93B", "79.3B"][data.supplyTier] ?? "-"} tokens
+              </p>
+              <p className="text-[10px] text-neutral-600 mt-0.5">then auto-graduation to DEX</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main grid */}
       <div className="grid gap-6 lg:grid-cols-3">

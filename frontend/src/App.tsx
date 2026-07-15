@@ -7,6 +7,8 @@ import { TokenDetail } from "@/pages/TokenDetail";
 import { Claim } from "@/pages/Claim";
 import { Referral } from "@/pages/Referral";
 import { Watchlist } from "@/pages/Watchlist";
+import { Portfolio } from "@/pages/Portfolio";
+import { Leaderboard } from "@/pages/Leaderboard";
 import { NotFound } from "@/pages/NotFound";
 
 export default function App() {
@@ -17,6 +19,9 @@ export default function App() {
         <Route path="/advanced" element={<Advanced />} />
         <Route path="/create" element={<Create />} />
         <Route path="/token/:chainId/:address" element={<TokenDetail />} />
+        <Route path="/portfolio" element={<Portfolio />} />
+        <Route path="/portfolio/:address" element={<Portfolio />} />
+        <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/claim" element={<Claim />} />
         <Route path="/referral" element={<Referral />} />
         <Route path="/watchlist" element={<Watchlist />} />

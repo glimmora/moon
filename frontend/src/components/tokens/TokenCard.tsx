@@ -5,6 +5,7 @@ import { formatMarketCap, formatPercent, shortenAddress, timeAgo } from "@/lib/f
 import { chainMeta } from "@/config/chains";
 import { cn } from "@/lib/cn";
 import { useState } from "react";
+import { LaunchCountdown } from "./LaunchCountdown";
 
 interface TokenCardProps {
   token: TokenListItem;
@@ -108,23 +109,15 @@ export function TokenCard({ token, defaultWatched = false }: TokenCardProps) {
         </div>
       </div>
 
-      {/* Graduation progress */}
+      {/* Graduation progress / countdown */}
       <div className="relative mt-3">
-        <div className="flex items-center justify-between text-[10px] text-neutral-500 mb-1">
-          <span>Graduation</span>
-          <span className={cn("tabular font-medium", progress >= 80 ? "text-moon-300" : "text-neutral-400")}>
-            {progress.toFixed(0)}%
-          </span>
-        </div>
-        <div className="progress-track">
-          <div
-            className={cn(
-              "progress-fill",
-              token.graduated && "bg-gradient-to-r from-emerald-500 to-cyan-500",
-            )}
-            style={{ width: `${token.graduated ? 100 : progress}%` }}
-          />
-        </div>
+        <LaunchCountdown
+          progress={progress}
+          graduated={token.graduated}
+          createdAt={token.createdAt}
+          volume24h={token.volume24h}
+          compact
+        />
       </div>
 
       {/* Footer */}

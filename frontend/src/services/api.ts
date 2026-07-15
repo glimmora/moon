@@ -19,6 +19,98 @@ export interface BubblemapNode {
   connections: string[];
 }
 
+/* ── Portfolio types ── */
+export interface PortfolioPosition {
+  chainId: number;
+  tokenAddress: string;
+  name: string;
+  symbol: string;
+  imageUrl: string;
+  balance: string;
+  balanceDisplay: number;
+  priceUsd: number;
+  valueUsd: number;
+  percentage: number;
+  graduated: boolean;
+  curveShape: number;
+}
+
+export interface PortfolioTrade {
+  txHash: string;
+  chainId: number;
+  tokenAddress: string;
+  tokenName: string;
+  tokenSymbol: string;
+  side: "buy" | "sell" | "graduate";
+  quoteAmount: string;
+  tokenAmount: string;
+  priceUsd: number;
+  timestamp: number;
+}
+
+export interface PortfolioCreatedToken {
+  chainId: number;
+  address: string;
+  name: string;
+  symbol: string;
+  imageUrl: string;
+  supplyTier: number;
+  curveShape: number;
+  priceUsd: number;
+  marketCapUsd: number;
+  holders: number;
+  volume24h: number;
+  graduated: boolean;
+  createdAt: number;
+}
+
+export interface Portfolio {
+  address: string;
+  totalValueUsd: number;
+  totalVolume: number;
+  tradeCount: number;
+  createdCount: number;
+  graduatedCount: number;
+  positions: PortfolioPosition[];
+  recentTrades: PortfolioTrade[];
+  createdTokens: PortfolioCreatedToken[];
+}
+
+/* ── Leaderboard types ── */
+export interface LeaderboardTrader {
+  rank: number;
+  address: string;
+  volume: string;
+  volumeUsd: number;
+  trades: number;
+}
+
+export interface LeaderboardCreator {
+  rank: number;
+  address: string;
+  tokensCreated: number;
+  totalVolume24h: number;
+  totalHolders: number;
+}
+
+export interface LeaderboardToken {
+  rank: number;
+  chainId: number;
+  address: string;
+  name: string;
+  symbol: string;
+  imageUrl: string;
+  supplyTier: number;
+  curveShape: number;
+  priceUsd: number;
+  marketCapUsd: number;
+  holders: number;
+  volume24h: number;
+  graduated: boolean;
+  creator: string;
+  createdAt: number;
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
@@ -96,5 +188,23 @@ export const api = {
 
   search(q: string) {
     return getJson<TokenListItem[]>(`/api/search?q=${encodeURIComponent(q)}`);
+  },
+
+  /* ── Portfolio ── */
+  getPortfolio(address: string): Promise<Portfolio> {
+    return getJson<Portfolio>(`/api/portfolio/${address}`);
+  },
+
+  /* ── Leaderboard ── */
+  getTopTraders(limit = 50): Promise<LeaderboardTrader[]> {
+    return getJson<LeaderboardTrader[]>(`/api/leaderboard/traders?limit=${limit}`);
+  },
+
+  getTopCreators(limit = 50): Promise<LeaderboardCreator[]> {
+    return getJson<LeaderboardCreator[]>(`/api/leaderboard/creators?limit=${limit}`);
+  },
+
+  getTopTokens(sort: "volume" | "holders" | "marketcap" = "volume", limit = 50): Promise<LeaderboardToken[]> {
+    return getJson<LeaderboardToken[]>(`/api/leaderboard/tokens?sort=${sort}&limit=${limit}`);
   },
 };

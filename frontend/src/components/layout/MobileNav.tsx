@@ -1,13 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
-import { Rocket, Plus, Star, Gift, Users } from "lucide-react";
+import { Rocket, Plus, Trophy, Wallet, Gift } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const NAV = [
   { to: "/", label: "Explore", icon: Rocket },
+  { to: "/leaderboard", label: "Ranks", icon: Trophy },
   { to: "/create", label: "Launch", icon: Plus, primary: true },
-  { to: "/watchlist", label: "Watch", icon: Star },
+  { to: "/portfolio", label: "Wallet", icon: Wallet },
   { to: "/claim", label: "Claim", icon: Gift },
-  { to: "/referral", label: "Refer", icon: Users },
 ];
 
 export function MobileNav() {

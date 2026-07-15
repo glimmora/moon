@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Rocket, Search, Star, Plus, Gift, Users, SlidersHorizontal, Command } from "lucide-react";
+import { Rocket, Search, Star, Plus, Gift, Users, Command, Trophy, Wallet } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useNetworkMode } from "@/stores/networkMode";
@@ -7,7 +7,8 @@ import { useEffect, useState } from "react";
 
 const NAV = [
   { to: "/", label: "Explore", icon: Rocket },
-  { to: "/advanced", label: "Advanced", icon: SlidersHorizontal },
+  { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
+  { to: "/portfolio", label: "Portfolio", icon: Wallet },
   { to: "/create", label: "Launch", icon: Plus, highlight: true },
   { to: "/watchlist", label: "Watchlist", icon: Star },
   { to: "/claim", label: "Claim", icon: Gift },

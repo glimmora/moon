@@ -1,0 +1,103 @@
+import { useMemo, useEffect, useState } from "react";
+import { Rocket, TrendingUp, Timer } from "lucide-react";
+import { cn } from "@/lib/cn";
+
+interface LaunchCountdownProps {
+  /** Current progress 0..100 (volume / threshold * 100). */
+  progress: number;
+  /** Whether the token has already graduated. */
+  graduated?: boolean;
+  /** Optional ISO timestamp / ms-epoch when launched — used to compute velocity. */
+  createdAt?: number;
+  /** Optional current volume (24h). */
+  volume24h?: number;
+  /** Compact mode (used inside cards). */
+  compact?: boolean;
+}
+
+/**
+ * Visual countdown to graduation. Shows a progress bar with a "T-minus" ETA
+ * computed from the current volume velocity. When graduated, shows a celebratory
+ * "LAUNCHED" state.
+ */
+export function LaunchCountdown({
+  progress,
+  graduated,
+  createdAt,
+  volume24h,
+  compact,
+}: LaunchCountdownProps) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (graduated || !createdAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [graduated, createdAt]);
+
+  const { eta } = useMemo(() => {
+    if (graduated || !createdAt || !volume24h || volume24h <= 0) {
+      return { eta: null };
+    }
+    const elapsedSec = Math.max(1, (now - createdAt) / 1000);
+    const volPerSec = volume24h / elapsedSec;
+    const remaining = Math.max(0, 100 - progress);
+    // remaining% of threshold (assume ~50 ETH threshold for 1B tier)
+    const remainingVol = (remaining / 100) * 50;
+    const secLeft = volPerSec > 0 ? remainingVol / volPerSec : Infinity;
+    return { eta: secLeft };
+  }, [graduated, createdAt, volume24h, progress, now]);
+
+  if (graduated) {
+    return (
+      <div className={cn(
+        "flex items-center gap-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-300 font-semibold",
+        compact ? "text-[10px] px-2 py-1" : "text-xs px-3 py-1.5",
+      )}>
+        <Rocket className={cn(compact ? "h-3 w-3" : "h-3.5 w-3.5")} />
+        LAUNCHED
+      </div>
+    );
+  }
+
+  const pct = Math.min(100, Math.max(0, progress));
+
+  return (
+    <div className={cn(compact ? "space-y-1" : "space-y-2")}>
+      <div className="flex items-center justify-between text-[10px] text-neutral-500">
+        <span className="flex items-center gap-1">
+          <TrendingUp className="h-2.5 w-2.5" />
+          Graduation
+        </span>
+        <div className="flex items-center gap-2 tabular">
+          {eta !== null && Number.isFinite(eta) && eta > 0 && (
+            <span className="flex items-center gap-0.5 text-amber-400">
+              <Timer className="h-2.5 w-2.5" />
+              {formatEta(eta)}
+            </span>
+          )}
+          <span className={cn("font-medium", pct >= 80 ? "text-moon-300" : "text-neutral-400")}>
+            {pct.toFixed(0)}%
+          </span>
+        </div>
+      </div>
+      <div className="progress-track">
+        <div
+          className={cn(
+            "progress-fill",
+            pct >= 80 && "bg-gradient-to-r from-amber-500 to-moon-500 animate-glow-pulse",
+            pct >= 95 && "bg-gradient-to-r from-amber-400 via-pink-500 to-moon-500",
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function formatEta(secLeft: number): string {
+  if (secLeft < 60) return `${Math.floor(secLeft)}s`;
+  if (secLeft < 3600) return `${Math.floor(secLeft / 60)}m`;
+  if (secLeft < 86400) return `${Math.floor(secLeft / 3600)}h`;
+  return `${Math.floor(secLeft / 86400)}d`;
+}
