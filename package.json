@@ -1,0 +1,30 @@
+{
+  "name": "moon.fun",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Permissionless meme-token launchpad with multi-shape bonding curves.",
+  "license": "MIT",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "install:contracts": "pnpm --filter @moon.fun/contracts install",
+    "build:contracts": "pnpm --filter @moon.fun/contracts run build",
+    "test:contracts": "pnpm --filter @moon.fun/contracts run test",
+    "lint:contracts": "pnpm --filter @moon.fun/contracts run lint",
+    "dev:frontend": "pnpm --filter @moon.fun/frontend dev",
+    "build:frontend": "pnpm --filter @moon.fun/frontend build",
+    "lint:frontend": "pnpm --filter @moon.fun/frontend lint",
+    "dev:backend": "pnpm --filter @moon.fun/backend dev",
+    "build:backend": "pnpm --filter @moon.fun/backend build",
+    "lint:backend": "pnpm --filter @moon.fun/backend lint",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "setup": "bash scripts/setup-dev.sh"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.2"
+  }
+}

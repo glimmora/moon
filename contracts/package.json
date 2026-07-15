@@ -1,0 +1,27 @@
+{
+  "name": "@moon.fun/contracts",
+  "version": "1.0.0",
+  "description": "moon.fun smart contracts — bonding-curve launchpad",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test -vvv",
+    "test:watch": "forge test --watch -vvv",
+    "lint": "solhint 'src/**/*.sol' && forge fmt --check",
+    "lint:fix": "forge fmt && solhint 'src/**/*.sol' --fix",
+    "slither": "slither . --config-file slither.config.json",
+    "deploy:bsc": "forge script script/Deploy.s.sol:DeployBsc --rpc-url $BSC_RPC_URL --broadcast --verify",
+    "deploy:base": "forge script script/Deploy.s.sol:DeployBase --rpc-url $BASE_RPC_URL --broadcast --verify",
+    "deploy:arbitrum": "forge script script/Deploy.s.sol:DeployArbitrum --rpc-url $ARBITRUM_RPC_URL --broadcast --verify",
+    "deploy:bsc-testnet": "forge script script/Deploy.s.sol:DeployBscTestnet --rpc-url $BSC_TESTNET_RPC_URL --broadcast",
+    "deploy:base-sepolia": "forge script script/Deploy.s.sol:DeployBaseSepolia --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast",
+    "deploy:arbitrum-sepolia": "forge script script/Deploy.s.sol:DeployArbitrumSepolia --rpc-url $ARBITRUM_SEPOLIA_RPC_URL --broadcast",
+    "deploy:eth-sepolia": "forge script script/Deploy.s.sol:DeployEthereumSepolia --rpc-url $ETHEREUM_SEPOLIA_RPC_URL --broadcast",
+    "deploy:moon:bsc": "forge script script/DeployMoonToken.s.sol --rpc-url $BSC_RPC_URL --broadcast --verify",
+    "clean": "forge clean"
+  },
+  "devDependencies": {
+    "solhint": "^5.0.3"
+  }
+}

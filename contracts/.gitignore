@@ -1,0 +1,19 @@
+# Build artifacts
+out/
+cache/
+broadcast/
+
+# Dependencies (installed via `forge install`)
+lib/
+
+# Env
+.env
+.env.local
+
+# Coverage
+coverage/
+lcov.info
+
+# Misc
+*.log
+.DS_Store

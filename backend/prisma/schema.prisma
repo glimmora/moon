@@ -1,0 +1,139 @@
+// moon.fun backend Prisma schema.
+// Database: PostgreSQL 16
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A launched MoonToken tracked across one of 7 chains.
+model Token {
+  id          String   @id @default(cuid())
+  chainId     Int
+  address     String
+  curve       String?
+  name        String
+  symbol      String
+  imageUrl    String   @default("")
+  description String   @default("")
+  supplyTier  Int
+  curveShape  Int
+  totalSupply String
+  creator     String
+  graduated   Boolean  @default(false)
+  dexPair     String?
+  priceUsd    Float    @default(0)
+  marketCapUsd Float   @default(0)
+  holders     Int      @default(0)
+  volume24h   Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trades   Trade[]
+  holders  Holder[]
+  messages ChatMessage[]
+
+  @@unique([chainId, address])
+  @@index([chainId])
+  @@index([createdAt])
+  @@index([graduated])
+  @@index([volume24h])
+}
+
+/// A single buy/sell/graduate event on a bonding curve.
+model Trade {
+  id           String   @id @default(cuid())
+  txHash       String
+  chainId      Int
+  tokenAddress String
+  side         String // "buy" | "sell" | "graduate"
+  trader       String
+  quoteAmount  String
+  tokenAmount  String
+  priceUsd     Float
+  feeUsd       Float    @default(0)
+  blockNumber  BigInt
+  timestamp    DateTime
+  createdAt    DateTime @default(now())
+
+  token Token @relation(fields: [chainId, tokenAddress], references: [chainId, address])
+
+  @@unique([chainId, txHash, tokenAddress])
+  @@index([chainId, tokenAddress, timestamp])
+  @@index([trader])
+}
+
+/// A token holder snapshot (periodically refreshed by the holder listener).
+model Holder {
+  id          String   @id @default(cuid())
+  chainId     Int
+  tokenAddress String
+  address     String
+  balance     String
+  percentage  Float
+  isContract  Boolean  @default(false)
+  firstSeen   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  token Token @relation(fields: [chainId, tokenAddress], references: [chainId, address])
+
+  @@unique([chainId, tokenAddress, address])
+  @@index([chainId, tokenAddress])
+  @@index([address])
+}
+
+/// A chat message in a token's chat room.
+model ChatMessage {
+  id          String   @id @default(cuid())
+  chainId     Int
+  tokenAddress String
+  author      String
+  content     String
+  createdAt   DateTime @default(now())
+
+  token Token @relation(fields: [chainId, tokenAddress], references: [chainId, address])
+
+  @@index([chainId, tokenAddress, createdAt])
+}
+
+/// Per-chain indexer checkpoint (last processed block).
+model IndexerCheckpoint {
+  id           String @id
+  chainId      Int
+  eventName    String
+  lastBlock    BigInt @default(0n)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([chainId, eventName])
+}
+
+/// Aggregated referral stats per referrer.
+model ReferralStat {
+  id        String  @id @default(cuid())
+  referrer  String
+  chainId   Int
+  volume    String  @default("0")
+  rewards   String  @default("0")
+  count     Int     @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([referrer, chainId])
+  @@index([referrer])
+}
+
+/// Aggregated creator fee balances per creator.
+model CreatorFeeBalance {
+  id         String  @id @default(cuid())
+  creator    String
+  chainId    Int
+  quoteAsset String
+  amount     String  @default("0")
+  updatedAt  DateTime @updatedAt
+
+  @@unique([creator, chainId, quoteAsset])
+  @@index([creator])
+}

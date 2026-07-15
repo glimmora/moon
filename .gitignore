@@ -1,0 +1,55 @@
+# ─── Secrets ─────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+
+# ─── Dependencies ────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ─── Build artifacts ─────────────────────────────────────
+dist/
+build/
+out/
+.cache/
+.turbo/
+*.tsbuildinfo
+
+# ─── Foundry ─────────────────────────────────────────────
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
+
+# ─── Editor / OS ─────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# ─── Logs ────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ─── Misc ────────────────────────────────────────────────
+coverage/
+.next/
+*.pid
+.secrets/
+*.lock
+lib/
+out/
+cache/
+broadcast/
+node_modules/
+.env
+skills/
+upload/

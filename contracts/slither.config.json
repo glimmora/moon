@@ -1,0 +1,14 @@
+{
+  "detectors_to_run": "all",
+  "filter_paths": "lib|test|script|mocks",
+  "solc_remaps": [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "forge-std/=lib/forge-std/src/"
+  ],
+  "solc_solcs_select": "0.8.24",
+  "exclude_informational": false,
+  "exclude_low": false,
+  "exclude_medium": false,
+  "exclude_high": false,
+  "print_human_summary": true
+}

@@ -1,0 +1,115 @@
+import { useBubblemap, type BubblemapNode } from "@/hooks/useHolders";
+import { useMemo } from "react";
+import { shortenAddress } from "@/lib/format";
+import { CircleDot } from "lucide-react";
+
+interface BubblemapProps {
+  chainId: number;
+  tokenAddress: string;
+}
+
+/**
+ * Lightweight SVG bubble-map of token holders. Bubble radius is proportional to
+ * holding percentage; contracts are highlighted. Connections (transfers between
+ * holders) are drawn as faint lines.
+ */
+export function Bubblemap({ chainId, tokenAddress }: BubblemapProps) {
+  const { data, isLoading } = useBubblemap(chainId, tokenAddress);
+
+  const layout = useMemo(() => {
+    if (!data || data.length === 0) return { nodes: [], links: [] };
+    const maxPct = Math.max(...data.map((n) => n.percentage), 1);
+    const cx = 250;
+    const cy = 250;
+    const radius = 180;
+    const nodes = data.map((n, i) => {
+      const angle = (i / data.length) * Math.PI * 2;
+      const r = n.percentage > maxPct * 0.5 ? radius * 0.4 : radius;
+      return {
+        ...n,
+        x: cx + r * Math.cos(angle),
+        y: cy + r * Math.sin(angle),
+        size: 10 + (n.percentage / maxPct) * 40,
+      };
+    });
+    const links = data.flatMap((n) =>
+      n.connections.map((target) => ({
+        from: nodes.find((x) => x.address === n.address)!,
+        to: nodes.find((x) => x.address === target),
+      })),
+    ).filter((l) => l.from && l.to);
+    return { nodes, links };
+  }, [data]);
+
+  if (isLoading) {
+    return <div className="card h-80 animate-pulse" />;
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="card flex h-80 items-center justify-center text-sm text-neutral-500">
+        <CircleDot className="mr-2 h-5 w-5" />
+        No holder graph yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="card p-4">
+      <h3 className="mb-3 font-semibold">Holder Bubblemap</h3>
+      <svg viewBox="0 0 500 500" className="h-80 w-full" role="img" aria-label="Holder bubblemap">
+        {/* Connections */}
+        {layout.links.map((l, i) => (
+          <line
+            key={i}
+            x1={l.from.x}
+            y1={l.from.y}
+            x2={l.to!.x}
+            y2={l.to!.y}
+            stroke="rgba(120,120,120,0.15)"
+            strokeWidth="1"
+          />
+        ))}
+        {/* Bubbles */}
+        {layout.nodes.map((n) => (
+          <g key={n.address}>
+            <circle
+              cx={n.x}
+              cy={n.y}
+              r={n.size}
+              fill={n.isContract ? "rgba(59,130,246,0.35)" : "rgba(192,38,211,0.35)"}
+              stroke={n.isContract ? "#3b82f6" : "#c026d3"}
+              strokeWidth="1.5"
+            />
+            <text
+              x={n.x}
+              y={n.y + n.size + 12}
+              textAnchor="middle"
+              className="fill-neutral-400 text-[8px]"
+            >
+              {shortenAddress(n.address, 3)}
+            </text>
+            <text
+              x={n.x}
+              y={n.y + 3}
+              textAnchor="middle"
+              className="fill-neutral-200 text-[9px] font-bold"
+            >
+              {n.percentage.toFixed(1)}%
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div className="mt-2 flex gap-4 text-xs text-neutral-500">
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-moon-500" /> EOA
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-blue-500" /> Contract
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export type { BubblemapNode };
