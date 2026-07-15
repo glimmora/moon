@@ -2,6 +2,23 @@ import { type TokenListItem } from "@/hooks/useTokens";
 
 const BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
 
+export interface Holder {
+  address: string;
+  balance: string;
+  percentage: number;
+  isContract: boolean;
+  firstSeen: number;
+}
+
+export interface BubblemapNode {
+  id: string;
+  address: string;
+  balance: string;
+  percentage: number;
+  isContract: boolean;
+  connections: string[];
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
@@ -56,11 +73,11 @@ export const api = {
   },
 
   getHolders(chainId: number, address: string) {
-    return getJson(`/api/tokens/${chainId}/${address}/holders`);
+    return getJson<Holder[]>(`/api/tokens/${chainId}/${address}/holders`);
   },
 
   getBubblemap(chainId: number, address: string) {
-    return getJson(`/api/tokens/${chainId}/${address}/bubblemap`);
+    return getJson<BubblemapNode[]>(`/api/tokens/${chainId}/${address}/bubblemap`);
   },
 
   getPriceHistory(chainId: number, address: string, window = "24h") {

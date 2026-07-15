@@ -1,4 +1,5 @@
-import { useQuery, useReadContract } from "wagmi";
+import { useReadContract } from "wagmi";
+import { useQuery } from "@tanstack/react-query";
 import { getContracts } from "@/config/contracts";
 import { bondingCurveAbi } from "@/abi/BondingCurve";
 import { moonTokenAbi } from "@/abi/MoonToken";

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { type Address } from "viem";
 import { moonFactoryAbi } from "@/abi/MoonFactory";
 import { getContracts } from "@/config/contracts";
 import { parseContractError } from "@/lib/error";

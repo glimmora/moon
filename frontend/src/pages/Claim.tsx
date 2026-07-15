@@ -1,7 +1,7 @@
 import { useAccount } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/services/api";
-import { Gift, Loader2 } from "lucide-react";
+import { Gift, Loader2, Wallet, ArrowDownToLine } from "lucide-react";
 import { formatUsd, shortenAddress } from "@/lib/format";
 
 export function Claim() {
@@ -17,46 +17,60 @@ export function Claim() {
   const total = (data ?? []).reduce((sum, r) => sum + Number(r.amount) / 1e18, 0);
 
   return (
-    <div className="mx-auto max-w-2xl py-6 space-y-6">
-      <div className="flex items-center gap-2">
-        <Gift className="h-6 w-6 text-moon-400" />
-        <h1 className="text-2xl font-bold">Claim Creator Fees</h1>
+    <div className="mx-auto max-w-3xl py-8 space-y-6 animate-fade-in-up">
+      <div className="text-center">
+        <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-moon-gradient shadow-glow mb-3">
+          <Gift className="h-7 w-7 text-white" />
+        </div>
+        <h1 className="text-3xl font-bold font-display">Creator Fees</h1>
+        <p className="mt-2 text-neutral-400">Claim your 20% share of trade fees from tokens you launched.</p>
       </div>
 
       {!address ? (
-        <div className="card p-8 text-center text-sm text-neutral-500">
-          Connect your wallet to view and claim your creator fee earnings.
+        <div className="card p-12 text-center">
+          <Wallet className="mx-auto mb-3 h-10 w-10 text-neutral-600" />
+          <p className="text-sm text-neutral-500">Connect your wallet to view and claim your creator fee earnings.</p>
         </div>
       ) : isLoading ? (
-        <div className="card flex h-40 items-center justify-center">
+        <div className="card flex h-48 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-moon-400" />
         </div>
       ) : (
         <>
-          <div className="card p-6 text-center">
-            <p className="text-xs text-neutral-500">Total Claimable</p>
-            <p className="mt-1 text-3xl font-bold text-moon-400">{formatUsd(total)}</p>
-            <p className="mt-1 text-xs text-neutral-600">Wallet: {shortenAddress(address)}</p>
-            <button className="btn-primary mt-4 w-full" disabled={total === 0}>
-              Claim All
-            </button>
+          {/* Total card */}
+          <div className="card-elevated p-8 text-center relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-moon-700/10 via-transparent to-transparent pointer-events-none" />
+            <div className="relative">
+              <p className="text-xs uppercase tracking-wider text-neutral-500">Total Claimable</p>
+              <p className="mt-2 text-5xl font-bold text-gradient tabular">{formatUsd(total)}</p>
+              <p className="mt-2 text-xs text-neutral-600 font-mono">{shortenAddress(address)}</p>
+              <button className="btn-primary mt-6 w-full sm:w-auto !px-8" disabled={total === 0}>
+                <ArrowDownToLine className="h-4 w-4" /> Claim All
+              </button>
+            </div>
           </div>
 
+          {/* Per asset breakdown */}
           <div className="card overflow-hidden">
-            <div className="border-b border-neutral-800 p-4">
+            <div className="border-b border-white/[0.06] p-4">
               <h3 className="font-semibold">Per Quote Asset</h3>
             </div>
-            <div className="divide-y divide-neutral-800/50">
+            <div className="divide-y divide-white/[0.04]">
               {(data ?? []).map((row, i) => (
-                <div key={i} className="flex items-center justify-between p-4 text-sm">
-                  <span className="font-mono text-xs text-neutral-400">
-                    {row.quoteAsset === "0x0000000000000000000000000000000000000000" ? "ETH" : shortenAddress(row.quoteAsset)}
-                  </span>
-                  <span className="font-semibold">{formatUsd(Number(row.amount) / 1e18)}</span>
+                <div key={i} className="flex items-center justify-between p-4 text-sm hover:bg-white/[0.02] transition-colors">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-xs font-bold">
+                      {row.quoteAsset === "0x0000000000000000000000000000000000000000" ? "ETH" : "ERC"}
+                    </div>
+                    <span className="font-mono text-xs text-neutral-400">
+                      {row.quoteAsset === "0x0000000000000000000000000000000000000000" ? "Native" : shortenAddress(row.quoteAsset)}
+                    </span>
+                  </div>
+                  <span className="font-semibold tabular">{formatUsd(Number(row.amount) / 1e18)}</span>
                 </div>
               ))}
               {(!data || data.length === 0) && (
-                <div className="p-6 text-center text-sm text-neutral-500">No fees accrued yet.</div>
+                <div className="p-8 text-center text-sm text-neutral-500">No fees accrued yet.</div>
               )}
             </div>
           </div>

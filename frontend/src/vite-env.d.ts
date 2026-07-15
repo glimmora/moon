@@ -1,0 +1,59 @@
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_API_URL?: string;
+  readonly VITE_FACTORY_BSC?: string;
+  readonly VITE_FACTORY_BASE?: string;
+  readonly VITE_FACTORY_ARBITRUM?: string;
+  readonly VITE_FACTORY_BSC_TESTNET?: string;
+  readonly VITE_FACTORY_BASE_SEPOLIA?: string;
+  readonly VITE_FACTORY_ARBITRUM_SEPOLIA?: string;
+  readonly VITE_FACTORY_ETHEREUM_SEPOLIA?: string;
+  readonly VITE_FEE_ROUTER_BSC?: string;
+  readonly VITE_FEE_ROUTER_BASE?: string;
+  readonly VITE_FEE_ROUTER_ARBITRUM?: string;
+  readonly VITE_FEE_ROUTER_BSC_TESTNET?: string;
+  readonly VITE_FEE_ROUTER_BASE_SEPOLIA?: string;
+  readonly VITE_FEE_ROUTER_ARBITRUM_SEPOLIA?: string;
+  readonly VITE_FEE_ROUTER_ETHEREUM_SEPOLIA?: string;
+  readonly VITE_CREATOR_FEE_VAULT_BSC?: string;
+  readonly VITE_CREATOR_FEE_VAULT_BASE?: string;
+  readonly VITE_CREATOR_FEE_VAULT_ARBITRUM?: string;
+  readonly VITE_CREATOR_FEE_VAULT_BSC_TESTNET?: string;
+  readonly VITE_CREATOR_FEE_VAULT_BASE_SEPOLIA?: string;
+  readonly VITE_CREATOR_FEE_VAULT_ARBITRUM_SEPOLIA?: string;
+  readonly VITE_CREATOR_FEE_VAULT_ETHEREUM_SEPOLIA?: string;
+  readonly VITE_REFERRAL_REGISTRY_BSC?: string;
+  readonly VITE_REFERRAL_REGISTRY_BASE?: string;
+  readonly VITE_REFERRAL_REGISTRY_ARBITRUM?: string;
+  readonly VITE_REFERRAL_REGISTRY_BSC_TESTNET?: string;
+  readonly VITE_REFERRAL_REGISTRY_BASE_SEPOLIA?: string;
+  readonly VITE_REFERRAL_REGISTRY_ARBITRUM_SEPOLIA?: string;
+  readonly VITE_REFERRAL_REGISTRY_ETHEREUM_SEPOLIA?: string;
+  readonly VITE_MOON_BURNER_BSC?: string;
+  readonly VITE_MOON_BURNER_BASE?: string;
+  readonly VITE_MOON_BURNER_ARBITRUM?: string;
+  readonly VITE_MOON_BURNER_BSC_TESTNET?: string;
+  readonly VITE_MOON_BURNER_BASE_SEPOLIA?: string;
+  readonly VITE_MOON_BURNER_ARBITRUM_SEPOLIA?: string;
+  readonly VITE_MOON_BURNER_ETHEREUM_SEPOLIA?: string;
+  readonly VITE_V3_CONCENTRATOR_BSC?: string;
+  readonly VITE_V3_CONCENTRATOR_BASE?: string;
+  readonly VITE_V3_CONCENTRATOR_ARBITRUM?: string;
+  readonly VITE_V3_CONCENTRATOR_BSC_TESTNET?: string;
+  readonly VITE_V3_CONCENTRATOR_BASE_SEPOLIA?: string;
+  readonly VITE_V3_CONCENTRATOR_ARBITRUM_SEPOLIA?: string;
+  readonly VITE_V3_CONCENTRATOR_ETHEREUM_SEPOLIA?: string;
+  readonly VITE_MOON_TOKEN_BSC?: string;
+  readonly VITE_MOON_TOKEN_BASE?: string;
+  readonly VITE_MOON_TOKEN_ARBITRUM?: string;
+  readonly VITE_MOON_TOKEN_BSC_TESTNET?: string;
+  readonly VITE_MOON_TOKEN_BASE_SEPOLIA?: string;
+  readonly VITE_MOON_TOKEN_ARBITRUM_SEPOLIA?: string;
+  readonly VITE_MOON_TOKEN_ETHEREUM_SEPOLIA?: string;
+  readonly VITE_WALLETCONNECT_PROJECT_ID?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}

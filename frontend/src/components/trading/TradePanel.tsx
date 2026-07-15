@@ -6,7 +6,7 @@ import { formatEther, parseEther, type Address } from "viem";
 import { getBuyOut, getSellOut, type CurveReserves, CurveShape } from "@/lib/curve";
 import { formatToken, formatPrice, shortenAddress } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { ArrowDownToLine, ArrowUpFromLine, Loader2, AlertCircle } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Loader2, AlertCircle, Settings2, Check } from "lucide-react";
 
 interface TradePanelProps {
   chainId: number;
@@ -14,6 +14,8 @@ interface TradePanelProps {
   tokenAddress: Address;
   tokenSymbol: string;
 }
+
+const SLIPPAGE_PRESETS = [0.5, 1, 2, 5];
 
 export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }: TradePanelProps) {
   const { address } = useAccount();
@@ -23,10 +25,12 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
 
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [slippage, setSlippage] = useState(1);
 
   const reserves: CurveReserves | undefined = useMemo(() => {
     if (!reads.data || reads.data.some((r) => r.status !== "success")) return undefined;
-    const [price, rt, rq, vt, vq, tsInit, cBlock] = reads.data.map((r) => r.result) as bigint[];
+    const [, rt, rq, vt, vq, tsInit, cBlock] = reads.data.map((r) => r.result) as bigint[];
     return {
       realToken: rt,
       realQuote: rq,
@@ -34,7 +38,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
       virtualQuote: vq,
       totalSupplyInit: tsInit,
       creationBlock: cBlock,
-      currentBlock: cBlock + 10n, // optimistic: assume a few blocks elapsed
+      currentBlock: cBlock + 10n,
       curveShape: (meta.data?.curveShape ?? 0) as CurveShape,
     };
   }, [reads.data, meta.data]);
@@ -42,44 +46,66 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
   const quote = useMemo(() => {
     if (!reserves || !amount) return null;
     try {
+      const amt = parseEther(amount);
+      if (amt <= 0n) return null;
       if (side === "buy") {
-        const { tokensOut, fee } = getBuyOut(reserves, parseEther(amount));
-        return { out: tokensOut, fee, outLabel: `${formatToken(tokensOut)} ${tokenSymbol}` };
+        const { tokensOut, fee } = getBuyOut(reserves, amt);
+        const minOut = (tokensOut * BigInt(Math.floor((100 - slippage) * 100))) / 10000n;
+        return { out: tokensOut, minOut, fee, outLabel: `${formatToken(tokensOut)} ${tokenSymbol}` };
       }
-      const { netQuoteOut, fee } = getSellOut(reserves, parseEther(amount));
-      return { out: netQuoteOut, fee, outLabel: `${formatPrice(netQuoteOut)}` };
+      const { netQuoteOut, fee } = getSellOut(reserves, amt);
+      const minOut = (netQuoteOut * BigInt(Math.floor((100 - slippage) * 100))) / 10000n;
+      return { out: netQuoteOut, minOut, fee, outLabel: `${formatPrice(netQuoteOut)}` };
     } catch {
       return null;
     }
-  }, [reserves, amount, side, tokenSymbol]);
+  }, [reserves, amount, side, tokenSymbol, slippage]);
 
-  const currentPrice = reserves ? Number(formatEther(reserves.virtualQuote * 10n ** 18n / (reserves.virtualToken || 1n))) : 0;
+  const currentPrice = reserves
+    ? Number(formatEther((reserves.virtualQuote * 10n ** 18n) / (reserves.virtualToken || 1n)))
+    : 0;
 
   function submit() {
     if (!quote || !amount) return;
     if (side === "buy") {
-      trade.buy(amount, quote.out);
+      trade.buy(amount, quote.minOut);
     } else {
-      trade.sell(parseEther(amount), quote.out);
+      trade.sell(parseEther(amount), quote.minOut);
     }
   }
 
   const quickAmounts = ["0.01", "0.05", "0.1", "0.5"];
 
   return (
-    <div className="card p-4 space-y-4">
-      <div className="flex rounded-lg bg-neutral-900 p-1">
+    <div className="card-elevated p-4 space-y-4 sticky top-20">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold font-display">Trade</h3>
+        <button
+          onClick={() => setShowSettings((v) => !v)}
+          className={cn(
+            "rounded-lg p-1.5 text-neutral-500 hover:bg-white/[0.06] hover:text-neutral-300 transition-colors",
+            showSettings && "bg-white/[0.06] text-moon-300",
+          )}
+          aria-label="Trade settings"
+        >
+          <Settings2 className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Buy/Sell toggle */}
+      <div className="flex rounded-xl bg-ink-950/60 border border-white/[0.04] p-1">
         {(["buy", "sell"] as const).map((s) => (
           <button
             key={s}
             onClick={() => setSide(s)}
             className={cn(
-              "flex-1 rounded-md py-2 text-sm font-semibold capitalize transition-colors",
+              "flex-1 rounded-lg py-2.5 text-sm font-semibold capitalize transition-all duration-200",
               side === s
                 ? s === "buy"
-                  ? "bg-green-600 text-white"
-                  : "bg-red-600 text-white"
-                : "text-neutral-400 hover:text-neutral-100",
+                  ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-glow-green"
+                  : "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-glow-red"
+                : "text-neutral-400 hover:text-neutral-200",
             )}
           >
             {s}
@@ -87,9 +113,36 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
         ))}
       </div>
 
+      {/* Slippage settings */}
+      {showSettings && (
+        <div className="rounded-xl border border-white/[0.06] bg-ink-950/40 p-3 space-y-2 animate-fade-in">
+          <p className="text-xs text-neutral-500">Slippage Tolerance</p>
+          <div className="flex gap-1.5">
+            {SLIPPAGE_PRESETS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSlippage(s)}
+                className={cn(
+                  "flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors",
+                  slippage === s
+                    ? "bg-moon-500/20 text-moon-300 border border-moon-500/30"
+                    : "bg-white/[0.04] text-neutral-400 hover:text-neutral-200 border border-transparent",
+                )}
+              >
+                {s}%
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Amount input */}
       <div>
-        <label className="mb-1 block text-xs text-neutral-500">
-          {side === "buy" ? "Amount (ETH)" : `Amount (${tokenSymbol})`}
+        <label className="mb-1.5 block text-xs text-neutral-500 flex items-center justify-between">
+          <span>{side === "buy" ? "You pay" : "You sell"}</span>
+          {address && side === "sell" && (
+            <button className="text-moon-400 hover:text-moon-300 text-[10px] font-medium">MAX</button>
+          )}
         </label>
         <div className="relative">
           <input
@@ -98,9 +151,9 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.0"
-            className="input pr-20"
+            className="input pr-24 !text-lg font-semibold tabular"
           />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-neutral-500">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-neutral-400">
             {side === "buy" ? "ETH" : tokenSymbol}
           </span>
         </div>
@@ -110,7 +163,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
               <button
                 key={a}
                 onClick={() => setAmount(a)}
-                className="flex-1 rounded-md bg-neutral-800 py-1 text-xs text-neutral-300 hover:bg-neutral-700"
+                className="flex-1 rounded-lg bg-white/[0.04] border border-white/[0.04] py-1.5 text-xs text-neutral-300 hover:bg-white/[0.08] hover:border-white/[0.08] transition-colors tabular"
               >
                 {a}
               </button>
@@ -119,56 +172,94 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
         )}
       </div>
 
+      {/* Quote */}
       {quote && (
-        <div className="space-y-1.5 rounded-lg bg-neutral-900 p-3 text-xs">
-          <Row label="You receive" value={quote.outLabel} />
+        <div className="space-y-2 rounded-xl bg-ink-950/40 border border-white/[0.04] p-3 text-xs animate-fade-in">
+          <Row label="You receive" value={quote.outLabel} highlight />
           <Row label="Price" value={formatPrice(currentPrice ? BigInt(Math.floor(currentPrice * 1e18)) : 0n)} />
-          <Row label="Fee (X-Mode)" value={`${(Number(quote.fee) / 1e18 * 100).toFixed(2)}%`} />
+          <Row
+            label="Fee (X-Mode)"
+            value={`${(Number(quote.fee) / 1e18 * 100).toFixed(2)}%`}
+            badge={Number(quote.fee) / 1e18 > 0.5 ? "anti-sniper" : undefined}
+          />
+          <div className="h-px bg-white/[0.04] my-1" />
           <Row label="Min received" value={quote.outLabel} muted />
+          <Row label="Slippage" value={`${slippage}%`} muted />
         </div>
       )}
 
+      {/* Error */}
       {trade.error && (
-        <div className="flex items-start gap-2 rounded-lg bg-red-950/50 p-3 text-xs text-red-300">
+        <div className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-300 animate-fade-in">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <span className="break-words">{trade.error}</span>
         </div>
       )}
 
+      {/* Submit */}
       <button
         onClick={submit}
         disabled={!quote || !amount || trade.pending || !address}
         className={cn(
-          "btn w-full",
-          side === "buy" ? "btn-primary" : "bg-red-600 text-white hover:bg-red-500",
+          "btn w-full !py-3 text-base",
+          side === "buy" ? "btn-success" : "btn-danger",
         )}
       >
         {trade.pending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Loader2 className="h-5 w-5 animate-spin" />
         ) : side === "buy" ? (
-          <ArrowDownToLine className="h-4 w-4" />
+          <ArrowDownToLine className="h-5 w-5" />
         ) : (
-          <ArrowUpFromLine className="h-4 w-4" />
+          <ArrowUpFromLine className="h-5 w-5" />
         )}
         {!address ? "Connect Wallet" : side === "buy" ? "Buy" : "Sell"}
       </button>
 
+      {/* Status */}
       {trade.confirmed && (
-        <p className="text-center text-xs text-green-400">Transaction confirmed!</p>
+        <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-400 animate-fade-in">
+          <Check className="h-3.5 w-3.5" /> Transaction confirmed!
+        </div>
       )}
 
       {address && (
-        <p className="text-center text-xs text-neutral-600">Wallet: {shortenAddress(address)}</p>
+        <p className="text-center text-[10px] text-neutral-600 font-mono">{shortenAddress(address)}</p>
       )}
     </div>
   );
 }
 
-function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+function Row({
+  label,
+  value,
+  muted,
+  highlight,
+  badge,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+  highlight?: boolean;
+  badge?: string;
+}) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-neutral-500">{label}</span>
-      <span className={muted ? "text-neutral-500" : "font-medium text-neutral-100"}>{value}</span>
+      <span className="text-neutral-500 flex items-center gap-1.5">
+        {label}
+        {badge && (
+          <span className="rounded bg-amber-500/15 text-amber-300 px-1.5 py-0.5 text-[9px] font-medium">
+            {badge}
+          </span>
+        )}
+      </span>
+      <span
+        className={cn(
+          "tabular",
+          muted ? "text-neutral-500" : highlight ? "font-semibold text-neutral-100" : "font-medium text-neutral-200",
+        )}
+      >
+        {value}
+      </span>
     </div>
   );
 }

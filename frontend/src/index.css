@@ -5,6 +5,11 @@
 @layer base {
   :root {
     color-scheme: dark;
+    --bg-base: #07060d;
+    --bg-elev: #0b0a14;
+    --bg-card: #100e1c;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-default: rgba(255, 255, 255, 0.1);
   }
 
   html,
@@ -14,49 +19,238 @@
   }
 
   body {
-    @apply bg-neutral-950 text-neutral-100 antialiased;
+    @apply bg-ink-950 text-neutral-100 antialiased;
     font-family: "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Prevent iOS zoom on input focus */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
-  /* Custom scrollbar */
+  /* Modern scrollbar */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-neutral-900;
+    @apply bg-ink-950;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-neutral-700 rounded-full;
+    @apply bg-ink-800 rounded-full border-2 border-ink-950;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-neutral-600;
+    @apply bg-moon-700;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-moon-500/40 text-white;
+  }
+
+  /* Focus ring */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-moon-400/60 ring-offset-2 ring-offset-ink-950;
   }
 }
 
 @layer components {
+  /* Glassmorphic card */
   .card {
-    @apply rounded-2xl border border-neutral-800 bg-neutral-900/60 backdrop-blur-sm;
+    @apply rounded-2xl border border-white/[0.06] bg-white/[0.025] backdrop-blur-xl shadow-inner-glow;
+    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
   }
 
+  .card-hover {
+    @apply card transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.04] hover:shadow-glow;
+  }
+
+  /* Elevated card with stronger surface */
+  .card-elevated {
+    @apply rounded-2xl border border-white/[0.08] bg-ink-900/80 backdrop-blur-xl shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)];
+  }
+
+  /* Buttons */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none select-none;
   }
   .btn-primary {
-    @apply btn bg-moon-600 text-white hover:bg-moon-500;
+    @apply btn relative overflow-hidden text-white;
+    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px -8px rgba(168, 85, 247, 0.6);
   }
+  .btn-primary:hover {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 8px 32px -6px rgba(168, 85, 247, 0.8);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+  }
+
+  .btn-success {
+    @apply btn text-white;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px -8px rgba(16, 185, 129, 0.6);
+  }
+  .btn-success:hover {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 8px 32px -6px rgba(16, 185, 129, 0.8);
+    transform: translateY(-1px);
+  }
+
+  .btn-danger {
+    @apply btn text-white;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px -8px rgba(239, 68, 68, 0.6);
+  }
+  .btn-danger:hover {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 8px 32px -6px rgba(239, 68, 68, 0.8);
+    transform: translateY(-1px);
+  }
+
   .btn-ghost {
-    @apply btn bg-neutral-800 text-neutral-100 hover:bg-neutral-700;
+    @apply btn bg-white/[0.04] text-neutral-200 border border-white/[0.06] hover:bg-white/[0.08] hover:border-white/[0.1];
   }
+  .btn-ghost:hover {
+    transform: translateY(-1px);
+  }
+
   .btn-outline {
-    @apply btn border border-neutral-700 text-neutral-100 hover:bg-neutral-800;
+    @apply btn border border-white/[0.1] text-neutral-200 hover:bg-white/[0.04] hover:border-white/[0.16];
   }
 
+  /* Inputs */
   .input {
-    @apply w-full rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-moon-500 focus:outline-none focus:ring-1 focus:ring-moon-500;
+    @apply w-full rounded-xl border border-white/[0.08] bg-ink-900/60 px-4 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-600 backdrop-blur-sm transition-all duration-200;
+    /* Prevent iOS zoom: minimum 16px font */
+    font-size: 16px;
+  }
+  .input:hover {
+    @apply border-white/[0.12];
+  }
+  .input:focus {
+    @apply border-moon-400 bg-ink-900/80;
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+    outline: none;
   }
 
+  /* Chips */
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors;
   }
+  .chip-neutral {
+    @apply chip bg-white/[0.06] text-neutral-300 border border-white/[0.04];
+  }
+  .chip-moon {
+    @apply chip bg-moon-500/15 text-moon-300 border border-moon-500/20;
+  }
+  .chip-green {
+    @apply chip bg-emerald-500/15 text-emerald-300 border border-emerald-500/20;
+  }
+  .chip-amber {
+    @apply chip bg-amber-500/15 text-amber-300 border border-amber-500/20;
+  }
+  .chip-blue {
+    @apply chip bg-blue-500/15 text-blue-300 border border-blue-500/20;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #e879f9 0%, #f0abfc 50%, #fbbf24 100%);
+  }
+  .text-gradient-green {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  }
+
+  /* Aurora background blob */
+  .aurora-blob {
+    @apply pointer-events-none absolute rounded-full blur-3xl opacity-50;
+    will-change: transform, opacity;
+  }
+
+  /* Progress bar */
+  .progress-track {
+    @apply h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06];
+  }
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-500 ease-out;
+    background: linear-gradient(90deg, #a855f7 0%, #ec4899 100%);
+  }
+
+  /* Shimmer skeleton */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.02) 0%,
+      rgba(255, 255, 255, 0.06) 50%,
+      rgba(255, 255, 255, 0.02) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer rounded-2xl;
+  }
+
+  /* Divider with subtle gradient */
+  .divider {
+    @apply h-px w-full;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  }
+}
+
+@layer utilities {
+  /* Safe area for notched devices */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .safe-x {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Hide scrollbar but keep scrollable */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Glass overlay */
+  .glass {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* Subtle grid pattern */
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Dot pattern */
+  .bg-dots {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* Tabular numbers for stats */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* Sticky header backdrop fade */
+.header-blur {
+  background: linear-gradient(180deg, rgba(7, 6, 13, 0.85) 0%, rgba(7, 6, 13, 0.6) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
 }

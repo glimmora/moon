@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTokens } from "@/hooks/useTokens";
 import { TokenCard } from "@/components/tokens/TokenCard";
 import { chainMeta } from "@/config/chains";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const TIERS = ["All", "1B", "10B", "100B"] as const;
@@ -10,10 +11,16 @@ const CURVES = ["All", "Linear", "Exponential", "Logarithmic"] as const;
 
 export function Advanced() {
   const { data, isLoading } = useTokens();
-  const [query, setQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get("q") ?? "";
+  const [query, setQuery] = useState(initialQuery);
   const [tier, setTier] = useState<(typeof TIERS)[number]>("All");
   const [curve, setCurve] = useState<(typeof CURVES)[number]>("All");
   const [chainFilter, setChainFilter] = useState<number | "all">("all");
+
+  useEffect(() => {
+    if (initialQuery) setQuery(initialQuery);
+  }, [initialQuery]);
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -28,28 +35,42 @@ export function Advanced() {
   }, [data, query, tier, curve, chainFilter]);
 
   return (
-    <div className="space-y-4 py-6">
+    <div className="space-y-5 py-6 animate-fade-in-up">
       <div className="flex items-center gap-2">
-        <SlidersHorizontal className="h-5 w-5 text-moon-400" />
-        <h1 className="text-xl font-bold">Advanced Explorer</h1>
+        <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-moon-500/15 border border-moon-500/20">
+          <SlidersHorizontal className="h-5 w-5 text-moon-400" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold font-display">Advanced Explorer</h1>
+          <p className="text-xs text-neutral-500">{filtered.length} token{filtered.length === 1 ? "" : "s"} match</p>
+        </div>
       </div>
 
-      <div className="card p-4 space-y-3">
+      {/* Filter bar */}
+      <div className="card-elevated p-4 space-y-4">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name or symbol…"
-            className="input pl-9"
+            placeholder="Search by name, symbol, or address…"
+            className="input pl-10 pr-10"
           />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
           <FilterGroup label="Supply Tier" options={TIERS as unknown as string[]} value={tier} onChange={(v) => setTier(v as typeof tier)} />
           <FilterGroup label="Curve" options={CURVES as unknown as string[]} value={curve} onChange={(v) => setCurve(v as typeof curve)} />
           <div>
-            <label className="mb-1 block text-xs text-neutral-500">Chain</label>
+            <label className="mb-1.5 block text-xs text-neutral-400 font-medium">Chain</label>
             <select
               value={chainFilter}
               onChange={(e) => setChainFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
@@ -64,18 +85,24 @@ export function Advanced() {
         </div>
       </div>
 
+      {/* Results */}
       {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="card h-44 animate-pulse" />
+            <div key={i} className="shimmer h-52" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-neutral-500">No tokens match your filters.</div>
+        <div className="card p-12 text-center">
+          <Search className="mx-auto mb-3 h-10 w-10 text-neutral-600" />
+          <p className="text-sm text-neutral-400">No tokens match your filters.</p>
+        </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((t) => (
-            <TokenCard key={`${t.chainId}-${t.address}`} token={t} />
+          {filtered.map((t, i) => (
+            <div key={`${t.chainId}-${t.address}`} className="animate-fade-in-up" style={{ animationDelay: `${i * 30}ms` }}>
+              <TokenCard token={t} />
+            </div>
           ))}
         </div>
       )}
@@ -86,15 +113,17 @@ export function Advanced() {
 function FilterGroup({ label, options, value, onChange }: { label: string; options: string[]; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="mb-1 block text-xs text-neutral-500">{label}</label>
-      <div className="flex flex-wrap gap-1">
+      <label className="mb-1.5 block text-xs text-neutral-400 font-medium">{label}</label>
+      <div className="flex flex-wrap gap-1.5">
         {options.map((o) => (
           <button
             key={o}
             onClick={() => onChange(o)}
             className={cn(
-              "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-              value === o ? "bg-moon-600 text-white" : "bg-neutral-800 text-neutral-400 hover:text-neutral-100",
+              "rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
+              value === o
+                ? "bg-moon-500/20 text-moon-300 border border-moon-500/30 shadow-glow"
+                : "bg-white/[0.04] text-neutral-400 border border-transparent hover:bg-white/[0.06] hover:text-neutral-200",
             )}
           >
             {o}

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/services/api";
-import { Loader2 } from "lucide-react";
+import { Loader2, Activity } from "lucide-react";
 
 interface PriceChartProps {
   chainId: number;
@@ -26,25 +26,37 @@ export function PriceChart({ chainId, tokenAddress }: PriceChartProps) {
 
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
-      height: 280,
+      height: 320,
       layout: {
         background: { color: "transparent" },
-        textColor: "#a3a3a3",
+        textColor: "#71717a",
+        fontFamily: "Inter, system-ui, sans-serif",
       },
       grid: {
-        vertLines: { color: "rgba(255,255,255,0.04)" },
-        horzLines: { color: "rgba(255,255,255,0.04)" },
+        vertLines: { color: "rgba(255,255,255,0.025)" },
+        horzLines: { color: "rgba(255,255,255,0.025)" },
       },
-      timeScale: { borderColor: "rgba(255,255,255,0.1)" },
-      rightPriceScale: { borderColor: "rgba(255,255,255,0.1)" },
-      crosshair: { mode: 0 },
+      timeScale: {
+        borderColor: "rgba(255,255,255,0.06)",
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      rightPriceScale: { borderColor: "rgba(255,255,255,0.06)" },
+      crosshair: {
+        mode: 0,
+        vertLine: { color: "rgba(168, 85, 247, 0.3)", width: 1, style: 2, labelBackgroundColor: "#a855f7" },
+        horzLine: { color: "rgba(168, 85, 247, 0.3)", width: 1, style: 2, labelBackgroundColor: "#a855f7" },
+      },
     });
 
     const series = chart.addAreaSeries({
-      lineColor: "#c026d3",
-      topColor: "rgba(192,38,211,0.4)",
-      bottomColor: "rgba(192,38,211,0)",
+      lineColor: "#a855f7",
+      topColor: "rgba(168, 85, 247, 0.35)",
+      bottomColor: "rgba(168, 85, 247, 0)",
       lineWidth: 2,
+      crosshairMarkerRadius: 5,
+      crosshairMarkerBorderColor: "#ec4899",
+      crosshairMarkerBackgroundColor: "#a855f7",
     });
 
     chartRef.current = chart;
@@ -75,9 +87,12 @@ export function PriceChart({ chainId, tokenAddress }: PriceChartProps) {
   }, [data]);
 
   return (
-    <div className="card p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="font-semibold">Price</h3>
+    <div className="card-elevated p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-semibold flex items-center gap-2">
+          <Activity className="h-4 w-4 text-moon-400" />
+          Price
+        </h3>
         {isLoading && <Loader2 className="h-4 w-4 animate-spin text-neutral-500" />}
       </div>
       <div ref={containerRef} className="w-full" />

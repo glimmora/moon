@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAccount, useSimulateContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseEther, type Address } from "viem";
 import { bondingCurveAbi } from "@/abi/BondingCurve";
 import { parseContractError } from "@/lib/error";
