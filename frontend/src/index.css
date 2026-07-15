@@ -195,6 +195,22 @@
     @apply h-px w-full;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
   }
+
+  /* Stagger helpers — apply to children for cascading entrance */
+  .stagger > * {
+    @apply animate-fade-in-up;
+  }
+  .stagger > *:nth-child(1) { animation-delay: 50ms; }
+  .stagger > *:nth-child(2) { animation-delay: 100ms; }
+  .stagger > *:nth-child(3) { animation-delay: 150ms; }
+  .stagger > *:nth-child(4) { animation-delay: 200ms; }
+  .stagger > *:nth-child(5) { animation-delay: 250ms; }
+  .stagger > *:nth-child(6) { animation-delay: 300ms; }
+  .stagger > *:nth-child(7) { animation-delay: 350ms; }
+  .stagger > *:nth-child(8) { animation-delay: 400ms; }
+  .stagger > *:nth-child(9) { animation-delay: 450ms; }
+  .stagger > *:nth-child(10) { animation-delay: 500ms; }
+  .stagger > *:nth-child(n+11) { animation-delay: 550ms; }
 }
 
 @layer utilities {
@@ -253,4 +269,36 @@
   background: linear-gradient(180deg, rgba(7, 6, 13, 0.85) 0%, rgba(7, 6, 13, 0.6) 100%);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* View Transitions API — native crossfade on route change (Chrome/Edge 111+) */
+@supports (view-transition-name: none) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 350ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  ::view-transition-old(root) {
+    animation-name: fadeIn;
+  }
+  ::view-transition-new(root) {
+    animation-name: fadeInUp;
+  }
+}
+
+/* Reduced motion — disable all animations for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

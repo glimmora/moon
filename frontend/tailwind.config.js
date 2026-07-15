@@ -54,18 +54,37 @@ export default {
         "glow-red": "0 0 20px rgba(239, 68, 68, 0.35)",
         "inner-glow": "inset 0 1px 0 0 rgba(255,255,255,0.06)",
       },
+      transitionTimingFunction: {
+        "smooth": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "smooth-in": "cubic-bezier(0.4, 0, 1, 1)",
+        "smooth-out": "cubic-bezier(0, 0, 0.2, 1)",
+        "elastic": "cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+        "bounce-soft": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      },
+      transitionDuration: {
+        "250": "250ms",
+        "350": "350ms",
+        "500": "500ms",
+        "700": "700ms",
+      },
       animation: {
         "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "fade-in": "fadeIn 0.3s ease-in-out",
-        "fade-in-up": "fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
-        "scale-in": "scaleIn 0.2s ease-out",
-        "slide-up": "slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-        "shimmer": "shimmer 2s linear infinite",
+        "fade-in": "fadeIn 350ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "fade-in-up": "fadeInUp 450ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "fade-in-down": "fadeInDown 450ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "fade-in-left": "fadeInLeft 450ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "fade-in-right": "fadeInRight 450ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "scale-in": "scaleIn 300ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "slide-up": "slideUp 450ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "slide-down": "slideDown 350ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "shimmer": "shimmer 2.2s linear infinite",
         "aurora": "aurora 18s ease-in-out infinite",
-        "aurora-slow": "aurora 30s ease-in-out infinite",
+        "aurora-slow": "aurora 32s ease-in-out infinite",
         "float": "float 6s ease-in-out infinite",
-        "spark": "spark 1.5s ease-in-out infinite",
-        "glow-pulse": "glowPulse 2.5s ease-in-out infinite",
+        "spark": "spark 1.6s ease-in-out infinite",
+        "glow-pulse": "glowPulse 2.6s ease-in-out infinite",
+        "count-up": "countUp 800ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        "page-enter": "pageEnter 400ms cubic-bezier(0.16, 1, 0.3, 1) both",
       },
       keyframes: {
         fadeIn: {
@@ -73,15 +92,31 @@ export default {
           "100%": { opacity: "1" },
         },
         fadeInUp: {
-          "0%": { opacity: "0", transform: "translateY(12px)" },
+          "0%": { opacity: "0", transform: "translateY(16px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        fadeInDown: {
+          "0%": { opacity: "0", transform: "translateY(-16px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        fadeInLeft: {
+          "0%": { opacity: "0", transform: "translateX(-16px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        fadeInRight: {
+          "0%": { opacity: "0", transform: "translateX(16px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
         },
         scaleIn: {
           "0%": { opacity: "0", transform: "scale(0.96)" },
           "100%": { opacity: "1", transform: "scale(1)" },
         },
         slideUp: {
-          "0%": { opacity: "0", transform: "translateY(24px)" },
+          "0%": { opacity: "0", transform: "translateY(28px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        slideDown: {
+          "0%": { opacity: "0", transform: "translateY(-28px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
         shimmer: {
@@ -104,6 +139,14 @@ export default {
         glowPulse: {
           "0%, 100%": { boxShadow: "0 0 20px rgba(168, 85, 247, 0.25)" },
           "50%": { boxShadow: "0 0 36px rgba(168, 85, 247, 0.55)" },
+        },
+        countUp: {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        pageEnter: {
+          "0%": { opacity: "0", transform: "translateY(8px) scale(0.99)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
         },
       },
     },

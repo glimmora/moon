@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { Header } from "./Header";
 import { MobileNav } from "./MobileNav";
+import { PageTransition } from "@/components/transitions/PageTransition";
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -16,10 +17,14 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-ink-950" />
       </div>
 
-      <div className="relative z-10 flex flex-col flex-1">
+      {/* Header is always-on-top via sticky + z-50, wrapped in relative z-40 */}
+      <div className="relative z-40">
         <Header />
+      </div>
+
+      <div className="relative z-10 flex flex-col flex-1">
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-28 md:pb-12 pt-2">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </main>
         <footer className="relative z-10 mt-auto border-t border-white/[0.06] py-6">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
