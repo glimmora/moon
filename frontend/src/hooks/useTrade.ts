@@ -50,7 +50,8 @@ export function useTrade({ chainId, curveAddress }: UseTradeArgs) {
     }
   }
 
-  async function sell(tokenAmountIn: bigint, minQuoteOut: bigint) {
+  // AUDIT-FIX H-1/M-2: sell() now accepts referrer parameter
+  async function sell(tokenAmountIn: bigint, minQuoteOut: bigint, referrer?: Address) {
     if (!address) {
       setError("Connect wallet first.");
       return;
@@ -62,7 +63,7 @@ export function useTrade({ chainId, curveAddress }: UseTradeArgs) {
         abi: bondingCurveAbi,
         address: curveAddress,
         functionName: "sell",
-        args: [tokenAmountIn, minQuoteOut],
+        args: [tokenAmountIn, minQuoteOut, referrer ?? "0x0000000000000000000000000000000000000000"],
         chainId,
       });
       setLastTxHash(hash);

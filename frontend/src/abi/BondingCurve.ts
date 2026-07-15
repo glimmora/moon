@@ -16,6 +16,8 @@ export const bondingCurveAbi = [
     inputs: [
       { name: "tokenAmountIn", type: "uint256" },
       { name: "minQuoteOut", type: "uint256" },
+      // AUDIT-FIX H-1: Added referrer parameter
+      { name: "referrer", type: "address" },
     ],
     outputs: [{ name: "quoteOut", type: "uint256" }],
     stateMutability: "nonpayable",

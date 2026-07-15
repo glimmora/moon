@@ -109,8 +109,8 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
     }
 
     /// @inheritdoc IMoonToken
-    /// @dev Self-burn is always allowed (no role needed).
-    function burn(uint256 amount) external override {
+    /// @dev AUDIT-FIX M-1: Add onlyRole(MINTER_ROLE) — burn should be restricted.
+    function burn(uint256 amount) external override onlyRole(MINTER_ROLE) {
         _burn(msg.sender, amount);
     }
 

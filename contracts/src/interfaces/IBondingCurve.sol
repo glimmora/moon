@@ -19,6 +19,7 @@ interface IBondingCurve {
     error NotInitialized();
     error AlreadyInitialized();
     error ZeroAmount();
+    error ZeroAddress(); // AUDIT-FIX L-2
     error InsufficientQuote();
     error InsufficientTokens();
     error AlreadyGraduated();
@@ -68,7 +69,8 @@ interface IBondingCurve {
 
     /// @notice Sell `tokenAmountIn` tokens for the quote asset.
     /// @dev CEI: effects → interactions → burnFrom LAST.
-    function sell(uint256 tokenAmountIn, uint256 minQuoteOut) external returns (uint256 quoteOut);
+    // AUDIT-FIX H-1: Add referrer parameter to sell()
+    function sell(uint256 tokenAmountIn, uint256 minQuoteOut, address referrer) external returns (uint256 quoteOut);
 
     /// @notice Graduate the token to DEX trading once threshold reached.
     function graduate() external;

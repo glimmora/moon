@@ -162,7 +162,9 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
 
         // ── Effects ──────────────────────────────────────────────
         s_realTokenReserves += tokensOut;
-        s_realQuoteReserves += quoteAmountIn;
+        // AUDIT-FIX H-2: Add quoteAfterFee (not quoteAmountIn) to reserves.
+        // Fee is sent out via _distributeFee, so only the after-fee portion stays in the curve.
+        s_realQuoteReserves += (quoteAmountIn - fee);
 
         // ── Interactions ─────────────────────────────────────────
         // 1) Mint tokens to the buyer (Option B).
@@ -185,7 +187,8 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
 
     /// @inheritdoc IBondingCurve
     /// @dev CEI: effects → interactions → burnFrom LAST.
-    function sell(uint256 tokenAmountIn, uint256 minQuoteOut)
+    // AUDIT-FIX H-1: Accept referrer parameter
+    function sell(uint256 tokenAmountIn, uint256 minQuoteOut, address referrer)
         external
         override
         nonReentrant
@@ -217,8 +220,9 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         }
 
         // 2) Distribute fees (all try/catch).
+        // AUDIT-FIX H-1: Forward referrer to _distributeFee (was hardcoded address(0))
         if (fee > 0) {
-            _distributeFee(fee, address(0));
+            _distributeFee(fee, referrer);
         }
 
         // 3) Burn seller tokens LAST (CEI).
@@ -314,9 +318,10 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         uint256 creatorShare = (feeAmount * CREATOR_FEE_SHARE) / 1e18;
         if (creatorShare > 0 && s_creatorFeeVault != address(0)) {
             // Fund the vault first.
+            // AUDIT-FIX M-3: Check ETH transfer result instead of ignoring
             if (quote == address(0)) {
                 (bool ok,) = payable(s_creatorFeeVault).call{value: creatorShare}("");
-                ok; // best-effort funding
+                if (!ok) { creatorShare = 0; } // skip accrue if funding failed
             } else {
                 IERC20(quote).safeTransfer(s_creatorFeeVault, creatorShare);
             }
@@ -337,9 +342,10 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
                 // ignore — use passed referrer
             }
             // Fund the registry.
+            // AUDIT-FIX M-3: Check ETH transfer result
             if (quote == address(0)) {
                 (bool ok,) = payable(s_referralRegistry).call{value: referralShare}("");
-                ok;
+                if (!ok) { referralShare = 0; }
             } else {
                 IERC20(quote).safeTransfer(s_referralRegistry, referralShare);
             }
@@ -360,9 +366,10 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         // Remaining share → FeeRouter (40% dev / 30% burn / 30% treasury).
         uint256 routerShare = feeAmount - creatorShare - referralShare;
         if (routerShare > 0 && s_feeRouter != address(0)) {
+            // AUDIT-FIX M-3: Check ETH transfer result
             if (quote == address(0)) {
                 (bool ok,) = payable(s_feeRouter).call{value: routerShare}("");
-                ok;
+                if (!ok) return; // can't distribute, abort silently
             } else {
                 IERC20(quote).safeTransfer(s_feeRouter, routerShare);
             }
@@ -520,7 +527,8 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         if (msg.sender != s_factory) revert NotFactory();
         if (token == s_token) revert RescueBlocked();
         if (token == s_quoteAsset) revert RescueBlocked();
-        if (to == address(0)) revert ZeroAmount();
+        // AUDIT-FIX L-2: Use correct error name
+        if (to == address(0)) revert ZeroAddress();
 
         if (token == address(0)) {
             (bool ok,) = payable(to).call{value: amount}("");
