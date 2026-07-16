@@ -45,7 +45,7 @@ coverage/
 *.pid
 .secrets/
 *.lock
-lib/
+/contracts/lib/
 out/
 cache/
 broadcast/
