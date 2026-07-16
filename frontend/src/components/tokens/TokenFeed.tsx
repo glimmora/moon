@@ -1,8 +1,9 @@
 import { useTokens } from "@/hooks/useTokens";
 import { TokenCard } from "./TokenCard";
 import { useNetworkMode } from "@/stores/networkMode";
+import { useBackendHealth } from "@/hooks/useBackendHealth";
 import { useMemo, useState } from "react";
-import { Flame, Clock, TrendingUp, Crown } from "lucide-react";
+import { Flame, Clock, TrendingUp, Crown, WifiOff } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Link } from "react-router-dom";
 import { formatMarketCap, formatPercent, shortenAddress } from "@/lib/format";
@@ -12,6 +13,7 @@ type Sort = "trending" | "new" | "graduated";
 
 export function TokenFeed() {
   const { mode } = useNetworkMode();
+  const { isOnline } = useBackendHealth();
   const [sort, setSort] = useState<Sort>("trending");
 
   const { data, isLoading, isError } = useTokens();
@@ -125,8 +127,17 @@ export function TokenFeed() {
         </div>
       ) : isError ? (
         <div className="card p-12 text-center text-sm text-neutral-500">
-          <Flame className="mx-auto mb-3 h-10 w-10 opacity-30" />
-          Failed to load tokens. The backend may not be running.
+          <WifiOff className="mx-auto mb-3 h-10 w-10 text-red-400/50" />
+          <p className="font-medium text-neutral-400">
+            {isOnline
+              ? "Backend is online but returned an error."
+              : "Backend is offline."}
+          </p>
+          <p className="mt-1 text-xs text-neutral-600">
+            {isOnline
+              ? "Check backend logs: tail -f .dev-logs/backend.log"
+              : "Start the backend: ./scripts/dev.sh backend"}
+          </p>
         </div>
       ) : sorted.length === 0 ? (
         <div className="card p-12 text-center">

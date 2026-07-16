@@ -17,16 +17,17 @@ const schema = z.object({
 
   JWT_SECRET: z.string().min(8).default("dev-secret"),
 
-  // RPC URLs
-  BSC_RPC_URL: z.string().url(),
-  BASE_RPC_URL: z.string().url(),
-  ARBITRUM_RPC_URL: z.string().url(),
-  BSC_TESTNET_RPC_URL: z.string().url(),
-  BASE_SEPOLIA_RPC_URL: z.string().url(),
-  ARBITRUM_SEPOLIA_RPC_URL: z.string().url(),
-  ETHEREUM_SEPOLIA_RPC_URL: z.string().url(),
+  // RPC URLs — all optional with defaults so the backend can start even
+  // if some chains are not configured.
+  BSC_RPC_URL: z.string().url().default("https://bsc-dataseed.binance.org"),
+  BASE_RPC_URL: z.string().url().default("https://mainnet.base.org"),
+  ARBITRUM_RPC_URL: z.string().url().default("https://arb1.arbitrum.io/rpc"),
+  BSC_TESTNET_RPC_URL: z.string().url().default("https://data-seed-prebsc-1-s1.binance.org:8545"),
+  BASE_SEPOLIA_RPC_URL: z.string().url().default("https://sepolia.base.org"),
+  ARBITRUM_SEPOLIA_RPC_URL: z.string().url().default("https://sepolia-arbitrum.api.onrender.com"),
+  ETHEREUM_SEPOLIA_RPC_URL: z.string().url().default("https://ethereum-sepolia-rpc.publicnode.com"),
 
-  // Factory addresses
+  // Factory addresses — optional (indexer only starts for configured chains)
   FACTORY_BSC: z.string().optional(),
   FACTORY_BASE: z.string().optional(),
   FACTORY_ARBITRUM: z.string().optional(),

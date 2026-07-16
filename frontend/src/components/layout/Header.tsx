@@ -1,9 +1,10 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Rocket, Search, Star, Plus, Gift, Users, Command, Trophy, Wallet, Sun, Moon } from "lucide-react";
+import { Rocket, Search, Star, Plus, Gift, Users, Command, Trophy, Wallet, Sun, Moon, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useNetworkMode } from "@/stores/networkMode";
 import { useTheme } from "@/stores/theme";
+import { useBackendHealth } from "@/hooks/useBackendHealth";
 import { useEffect, useState } from "react";
 
 const NAV = [
@@ -20,6 +21,7 @@ export function Header() {
   const { pathname } = useLocation();
   const { mode, toggle: toggleMode } = useNetworkMode();
   const { theme, toggle: toggleTheme } = useTheme();
+  const { isOnline, health } = useBackendHealth();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -129,6 +131,31 @@ export function Header() {
 
           {/* Right cluster */}
           <div className="ml-auto flex items-center gap-2">
+            {/* Backend health indicator */}
+            <div
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors",
+                isOnline
+                  ? theme === "light"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                  : theme === "light"
+                    ? "bg-red-50 text-red-700 border border-red-200"
+                    : "bg-red-500/10 text-red-400 border border-red-500/20",
+              )}
+              title={isOnline ? `Backend online (${health.latency}ms)` : "Backend offline — run ./scripts/dev.sh"}
+            >
+              {isOnline ? (
+                <Wifi className="h-3 w-3" />
+              ) : (
+                <WifiOff className="h-3 w-3" />
+              )}
+              <span className="hidden sm:inline">{isOnline ? "API" : "Offline"}</span>
+              {isOnline && health.latency !== undefined && (
+                <span className="hidden md:inline opacity-60 tabular">{health.latency}ms</span>
+              )}
+            </div>
+
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
