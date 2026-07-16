@@ -1,10 +1,9 @@
 /**
  * ABIs used by the backend indexer.
- * Copied from frontend/src/abi/ to avoid cross-directory imports
- * (which crash tsx when the path goes outside backend rootDir).
+ * Files are in backend/src/abi/ (copied from frontend to avoid cross-dir imports).
  */
-export { moonFactoryAbi } from "./MoonFactory.js";
-export { bondingCurveAbi } from "./BondingCurve.js";
-export { moonTokenAbi } from "./MoonToken.js";
-export { creatorFeeVaultAbi } from "./CreatorFeeVault.js";
-export { referralRegistryAbi } from "./ReferralRegistry.js";
+export { moonFactoryAbi } from "../abi/MoonFactory.js";
+export { bondingCurveAbi } from "../abi/BondingCurve.js";
+export { moonTokenAbi } from "../abi/MoonToken.js";
+export { creatorFeeVaultAbi } from "../abi/CreatorFeeVault.js";
+export { referralRegistryAbi } from "../abi/ReferralRegistry.js";
