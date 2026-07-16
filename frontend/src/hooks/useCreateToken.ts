@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useChainId } from "wagmi";
 import { moonFactoryAbi } from "@/abi/MoonFactory";
 import { getContracts } from "@/config/contracts";
 import { parseContractError } from "@/lib/error";
@@ -18,6 +18,8 @@ export interface CreateTokenForm {
 
 export function useCreateToken(chainId: number) {
   const { address } = useAccount();
+  const activeChainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
   const contracts = getContracts(chainId);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,13 +38,24 @@ export function useCreateToken(chainId: number) {
       setError("Connect wallet first.");
       return;
     }
-    if (!contracts?.factory) {
+    if (!contracts?.factory || contracts.factory === "0x0000000000000000000000000000000000000000") {
       setError("Factory not configured for this chain.");
       return;
     }
     setError(null);
     setPending(true);
     try {
+      // Auto-switch chain if wallet is on a different chain
+      if (activeChainId !== chainId) {
+        try {
+          await switchChainAsync({ chainId });
+        } catch (switchErr) {
+          setError(`Please switch your wallet to the target network. ${switchErr instanceof Error ? switchErr.message : ""}`);
+          setPending(false);
+          return;
+        }
+      }
+
       const hash = await writeContractAsync({
         abi: moonFactoryAbi,
         address: contracts.factory,

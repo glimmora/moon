@@ -1,8 +1,9 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Rocket, Search, Star, Plus, Gift, Users, Command, Trophy, Wallet } from "lucide-react";
+import { Rocket, Search, Star, Plus, Gift, Users, Command, Trophy, Wallet, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useNetworkMode } from "@/stores/networkMode";
+import { useTheme } from "@/stores/theme";
 import { useEffect, useState } from "react";
 
 const NAV = [
@@ -17,7 +18,8 @@ const NAV = [
 
 export function Header() {
   const { pathname } = useLocation();
-  const { mode, toggle } = useNetworkMode();
+  const { mode, toggle: toggleMode } = useNetworkMode();
+  const { theme, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -41,12 +43,21 @@ export function Header() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const handleModeToggle = () => {
+    toggleMode();
+    // Toast is fired by useWalletEvents watcher; no need to duplicate here.
+  };
+
   return (
     <>
       <header
         className={cn(
           "sticky top-0 z-40 transition-all duration-300 safe-top",
-          scrolled ? "header-blur border-b border-white/[0.06]" : "bg-transparent",
+          scrolled
+            ? theme === "light"
+              ? "bg-white/80 backdrop-blur-xl border-b border-neutral-200"
+              : "header-blur border-b border-white/[0.06]"
+            : "bg-transparent",
         )}
       >
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
@@ -59,7 +70,10 @@ export function Header() {
               </div>
             </div>
             <div className="hidden sm:block">
-              <span className="text-lg font-bold tracking-tight font-display">
+              <span className={cn(
+                "text-lg font-bold tracking-tight font-display",
+                theme === "light" ? "text-neutral-900" : "text-neutral-100",
+              )}>
                 moon<span className="text-gradient">.fun</span>
               </span>
             </div>
@@ -77,9 +91,13 @@ export function Header() {
                   className={cn(
                     "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     active
-                      ? "bg-white/[0.08] text-white shadow-inner-glow"
-                      : "text-neutral-400 hover:text-neutral-100 hover:bg-white/[0.04]",
-                    item.highlight && !active && "text-moon-300",
+                      ? theme === "light"
+                        ? "bg-neutral-900 text-white shadow-sm"
+                        : "bg-white/[0.08] text-white shadow-inner-glow"
+                      : theme === "light"
+                        ? "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
+                        : "text-neutral-400 hover:text-neutral-100 hover:bg-white/[0.04]",
+                    item.highlight && !active && "text-moon-600",
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -92,20 +110,45 @@ export function Header() {
           {/* Search trigger (desktop) */}
           <button
             onClick={() => setSearchOpen(true)}
-            className="hidden lg:flex items-center gap-2 ml-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-sm text-neutral-500 hover:bg-white/[0.04] hover:text-neutral-300 transition-colors w-56"
+            className={cn(
+              "hidden lg:flex items-center gap-2 ml-2 rounded-xl border px-3 py-2 text-sm transition-colors w-56",
+              theme === "light"
+                ? "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-neutral-100"
+                : "border-white/[0.06] bg-white/[0.02] text-neutral-500 hover:bg-white/[0.04]",
+            )}
           >
             <Search className="h-4 w-4" />
             <span className="flex-1 text-left">Search tokens…</span>
-            <kbd className="flex items-center gap-0.5 rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-neutral-400 font-mono">
+            <kbd className={cn(
+              "flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-mono",
+              theme === "light" ? "bg-neutral-200 text-neutral-600" : "bg-white/[0.06] text-neutral-400",
+            )}>
               <Command className="h-2.5 w-2.5" />K
             </kbd>
           </button>
 
           {/* Right cluster */}
           <div className="ml-auto flex items-center gap-2">
+            {/* Theme toggle */}
             <button
-              onClick={toggle}
-              className="btn-ghost text-xs !px-3"
+              onClick={toggleTheme}
+              className={cn(
+                "btn-ghost text-xs !px-2.5 !py-2",
+                theme === "light" && "hover:bg-neutral-200",
+              )}
+              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              title={`Theme: ${theme}`}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+
+            {/* Network mode toggle */}
+            <button
+              onClick={handleModeToggle}
+              className={cn(
+                "btn-ghost text-xs !px-3",
+                mode === "testnet" && "border-amber-500/30 text-amber-600",
+              )}
               aria-label={`Switch to ${mode === "mainnet" ? "testnet" : "mainnet"}`}
               title={`Network: ${mode}`}
             >
@@ -117,6 +160,7 @@ export function Header() {
               />
               {mode === "mainnet" ? "Mainnet" : "Testnet"}
             </button>
+
             <ConnectButton showBalance={false} chainStatus="icon" />
           </div>
         </div>
@@ -128,9 +172,17 @@ export function Header() {
           className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4 animate-fade-in"
           onClick={() => setSearchOpen(false)}
         >
-          <div className="absolute inset-0 bg-ink-950/80 backdrop-blur-sm" />
+          <div className={cn(
+            "absolute inset-0 backdrop-blur-sm",
+            theme === "light" ? "bg-neutral-900/40" : "bg-ink-950/80",
+          )} />
           <div
-            className="relative w-full max-w-xl card-elevated p-2 animate-scale-in"
+            className={cn(
+              "relative w-full max-w-xl p-2 animate-scale-in rounded-2xl border shadow-2xl",
+              theme === "light"
+                ? "bg-white border-neutral-200"
+                : "bg-ink-900 border-white/[0.08]",
+            )}
             onClick={(e) => e.stopPropagation()}
           >
             <form
@@ -144,14 +196,20 @@ export function Header() {
               }}
               className="flex items-center gap-2 px-3 py-2"
             >
-              <Search className="h-4 w-4 text-neutral-500" />
+              <Search className={cn("h-4 w-4", theme === "light" ? "text-neutral-400" : "text-neutral-500")} />
               <input
                 name="q"
                 autoFocus
                 placeholder="Search by name, symbol, or address…"
-                className="flex-1 bg-transparent text-sm text-neutral-100 placeholder:text-neutral-600 focus:outline-none"
+                className={cn(
+                  "flex-1 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none",
+                  theme === "light" ? "text-neutral-900" : "text-neutral-100",
+                )}
               />
-              <kbd className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] text-neutral-400 font-mono">ESC</kbd>
+              <kbd className={cn(
+                "rounded px-1.5 py-0.5 text-[10px] font-mono",
+                theme === "light" ? "bg-neutral-200 text-neutral-600" : "bg-white/[0.06] text-neutral-400",
+              )}>ESC</kbd>
             </form>
           </div>
         </div>

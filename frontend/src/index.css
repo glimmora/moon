@@ -10,6 +10,19 @@
     --bg-card: #100e1c;
     --border-subtle: rgba(255, 255, 255, 0.06);
     --border-default: rgba(255, 255, 255, 0.1);
+    --text-primary: #f5f5f5;
+    --text-secondary: #a3a3a3;
+  }
+
+  .light {
+    color-scheme: light;
+    --bg-base: #fafafa;
+    --bg-elev: #ffffff;
+    --bg-card: #ffffff;
+    --border-subtle: rgba(0, 0, 0, 0.08);
+    --border-default: rgba(0, 0, 0, 0.12);
+    --text-primary: #171717;
+    --text-secondary: #525252;
   }
 
   html,
@@ -19,12 +32,14 @@
   }
 
   body {
-    @apply bg-ink-950 text-neutral-100 antialiased;
+    @apply antialiased;
     font-family: "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     /* Prevent iOS zoom on input focus */
     -webkit-text-size-adjust: 100%;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
     text-size-adjust: 100%;
   }
 

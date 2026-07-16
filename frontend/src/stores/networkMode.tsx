@@ -6,6 +6,8 @@ interface NetworkModeContextValue {
   setMode: (m: NetworkMode) => void;
   activeChainIds: number[];
   toggle: () => void;
+  /** The default chain ID for the current mode (first active chain). */
+  defaultChainId: number;
 }
 
 const NetworkModeContext = createContext<NetworkModeContextValue | undefined>(undefined);
@@ -14,9 +16,9 @@ const STORAGE_KEY = "moon.fun.networkMode";
 
 export function NetworkModeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<NetworkMode>(() => {
-    if (typeof window === "undefined") return "mainnet";
+    if (typeof window === "undefined") return "testnet"; // default to testnet (deployed there)
     const saved = window.localStorage.getItem(STORAGE_KEY) as NetworkMode | null;
-    return saved ?? "mainnet";
+    return saved ?? "testnet";
   });
 
   const setMode = (m: NetworkMode) => {
@@ -32,10 +34,14 @@ export function NetworkModeProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.networkMode = mode;
   }, [mode]);
 
+  const activeChainIds = getActiveChainIds(mode);
+  const defaultChainId = activeChainIds[0];
+
   const value: NetworkModeContextValue = {
     mode,
     setMode,
-    activeChainIds: getActiveChainIds(mode),
+    activeChainIds,
+    defaultChainId,
     toggle,
   };
 
