@@ -56,7 +56,6 @@ export function useCreateToken(chainId: number) {
         }
       }
 
-      // Build the args object — must match CreateParams struct on-chain.
       const createArgs = {
         name: form.name,
         symbol: form.symbol,
@@ -69,26 +68,40 @@ export function useCreateToken(chainId: number) {
         curveShape: form.curveShape,
       };
 
-      // Use a high gas limit to avoid estimation failures — the factory
-      // createToken() does multiple external calls (clone + init + role grants)
-      // which can confuse gas estimation in some wallets.
+      // Step 1: Try wagmi's auto gas estimation (no gas param = auto-estimate)
+      try {
+        const hash = await writeContractAsync({
+          abi: moonFactoryAbi,
+          address: contracts.factory,
+          functionName: "createToken",
+          args: [createArgs],
+          chainId,
+          // No gas param → wagmi auto-estimates via eth_estimateGas
+        });
+        setLastTxHash(hash);
+        return;
+      } catch (estErr) {
+        const estMsg = parseContractError(estErr);
+        // If it's a user rejection or a real contract revert, don't retry
+        if (/reject|denied|cancel/i.test(estMsg) || /EmptyName|EmptySymbol|InvalidMaxTx|InvalidMaxHold|InvalidCooldown|InvalidSupplyTier|InvalidCurveShape/.test(estMsg)) {
+          throw estErr;
+        }
+        // If gas estimation failed (null/destructure error), retry with explicit gas
+        // This happens with some wallets that can't estimate multi-call factory functions
+      }
+
+      // Step 2: Fallback — send with explicit high gas limit
       const hash = await writeContractAsync({
         abi: moonFactoryAbi,
         address: contracts.factory,
         functionName: "createToken",
         args: [createArgs],
         chainId,
-        gas: 5_000_000n, // 5M gas — well above the ~2.5M actual usage
+        gas: 5_000_000n, // fallback: 5M gas (actual usage ~2.5M)
       });
       setLastTxHash(hash);
     } catch (e) {
-      const msg = parseContractError(e);
-      // If the error mentions gasLimit or estimation, suggest manual gas.
-      if (msg.includes("gasLimit") || msg.includes("gas") || msg.includes("destructure")) {
-        setError("Gas estimation failed. Please try again — if the error persists, the factory may need ADMIN_ROLE on infra contracts. Run the post-deploy setup in DEPLOYMENT.md.");
-      } else {
-        setError(msg);
-      }
+      setError(parseContractError(e));
     } finally {
       setPending(false);
     }
