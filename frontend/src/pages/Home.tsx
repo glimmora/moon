@@ -18,8 +18,8 @@ export function Home() {
           <span className="inline-block ml-2 animate-float">🌙</span>
         </h1>
         <p className="mx-auto max-w-2xl text-base sm:text-lg text-neutral-400 leading-relaxed">
-          Permissionless meme-token launchpad with multi-shape bonding curves, on-chain
-          referrals, and a self-buyback-and-burn flywheel for $MOON.
+          Permissionless meme-token launchpad with bonding curves, on-chain
+          referrals, and a self-sustaining buyback-and-burn flywheel.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link to="/create" className="btn-primary !px-6 !py-3 text-base">
@@ -36,7 +36,7 @@ export function Home() {
           <StatPill value="7" label="Chains" />
           <StatPill value="3" label="Curve Shapes" />
           <StatPill value="1.25%" label="Final Fee" />
-          <StatPill value="0xdEaD" label="LP Burn" mono />
+          <StatPill value="Burned" label="LP Burn" />
         </div>
       </section>
 
@@ -44,20 +44,20 @@ export function Home() {
       <section className="grid gap-4 sm:grid-cols-3">
         <FeatureCard
           icon={Shield}
-          title="Option B Tokenomics"
+          title="Tokenomics"
           desc="Mint-on-buy, burn-on-sell. No pre-mint, no rug surface. Total supply grows with real demand."
           accent="purple"
         />
         <FeatureCard
           icon={Zap}
-          title="X-Mode Anti-Sniper"
+          title="Anti-Sniper"
           desc="99% fee at block 0, linear decay to 1.25% by block 6. Snipers get rekt, fair launches win."
           accent="amber"
         />
         <FeatureCard
           icon={Flame}
           title="Auto-Graduation"
-          desc="Tokens graduate to DEX LP at threshold. LP burned to 0xdEaD — truly community-owned."
+          desc="Tokens graduate to DEX LP at threshold. LP permanently burned — truly community-owned."
           accent="pink"
         />
       </section>

@@ -178,7 +178,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
           <Row label="You receive" value={quote.outLabel} highlight />
           <Row label="Price" value={formatPrice(currentPrice ? BigInt(Math.floor(currentPrice * 1e18)) : 0n)} />
           <Row
-            label="Fee (X-Mode)"
+            label="Fee"
             value={`${(Number(quote.fee) / 1e18 * 100).toFixed(2)}%`}
             badge={Number(quote.fee) / 1e18 > 0.5 ? "anti-sniper" : undefined}
           />
