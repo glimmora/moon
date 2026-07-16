@@ -1,11 +1,11 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Rocket, Search, Star, Plus, Command, Trophy, Wallet,
-  Sun, Moon, Gift, Users, ChevronDown, LogOut,
+  Sun, Moon, Gift, Users, ChevronDown, LogOut, Globe, Check,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useDisconnect, useChainId } from "wagmi";
+import { useAccount, useDisconnect, useChainId, useSwitchChain } from "wagmi";
 import { useNetworkMode } from "@/stores/networkMode";
 import { useTheme } from "@/stores/theme";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
@@ -23,7 +23,6 @@ const NAV = [
 
 export function Header() {
   const { pathname } = useLocation();
-  const { mode, toggle: toggleMode } = useNetworkMode();
   const { theme, toggle: toggleTheme } = useTheme();
   const { isOnline } = useBackendHealth();
   const navigate = useNavigate();
@@ -144,33 +143,16 @@ export function Header() {
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
 
-            {/* Network mode toggle */}
-            <button
-              onClick={toggleMode}
-              className={cn(
-                "btn-ghost text-xs !px-3",
-                mode === "testnet" && "border-amber-500/30 text-amber-600",
-              )}
-              aria-label={`Switch to ${mode === "mainnet" ? "testnet" : "mainnet"}`}
-              title={`Network: ${mode}`}
-            >
-              <span
-                className={cn(
-                  "h-2 w-2 rounded-full",
-                  mode === "mainnet" ? "bg-emerald-400" : "bg-amber-400",
-                )}
-              />
-              {mode === "mainnet" ? "Mainnet" : "Testnet"}
-            </button>
+            {/* Network + chain selector dropdown */}
+            <NetworkDropdown />
 
-            {/* Single wallet button — ConnectButton when disconnected,
-                custom dropdown when connected (no duplication) */}
+            {/* Single wallet button */}
             <WalletButton />
           </div>
         </div>
       </header>
 
-      {/* Spacer to offset fixed header */}
+      {/* Spacer */}
       <div className="h-14" />
 
       {/* Search modal */}
@@ -225,13 +207,169 @@ export function Header() {
   );
 }
 
-/**
- * Single wallet button.
- * - When NOT connected: shows RainbowKit ConnectButton (opens modal).
- * - When connected: shows ONE custom button with wallet avatar + address + chevron,
- *   clicking opens dropdown with Claim Fees / Referrals / Disconnect.
- *   No duplication — the RainbowKit ConnectButton is NOT rendered when connected.
- */
+/* ── Network + Chain Selector Dropdown ────────────────────────────── */
+function NetworkDropdown() {
+  const { mode, toggle: toggleMode, activeChainIds } = useNetworkMode();
+  const { theme } = useTheme();
+  const walletChainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
+  const { address } = useAccount();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  // Find the current chain metadata
+  const currentMeta = walletChainId ? chainMeta[walletChainId] : undefined;
+  const isTestnet = mode === "testnet";
+
+  async function selectChain(chainId: number) {
+    setOpen(false);
+    if (!address) return; // just close if not connected
+    if (walletChainId === chainId) return;
+    try {
+      await switchChainAsync({ chainId });
+    } catch {
+      // user rejected — ignore
+    }
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      {/* Trigger button */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all",
+          isTestnet
+            ? theme === "light"
+              ? "border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+              : "border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15"
+            : theme === "light"
+              ? "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+              : "border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:bg-white/[0.06]",
+        )}
+      >
+        <Globe className="h-3.5 w-3.5 shrink-0" />
+        <span className="hidden sm:inline">
+          {currentMeta?.shortLabel ?? (isTestnet ? "Testnet" : "Mainnet")}
+        </span>
+        <ChevronDown className={cn("h-3 w-3 transition-transform shrink-0", open && "rotate-180")} />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          className={cn(
+            "absolute top-full right-0 mt-2 w-64 rounded-xl border shadow-xl overflow-hidden animate-scale-in z-[60]",
+            theme === "light"
+              ? "bg-white border-neutral-200"
+              : "bg-ink-900 border-white/[0.08]",
+          )}
+        >
+          {/* Mode toggle header */}
+          <div className={cn(
+            "flex items-center gap-1 p-1.5 border-b",
+            theme === "light" ? "border-neutral-100" : "border-white/[0.04]",
+          )}>
+            <button
+              onClick={() => { if (isTestnet) toggleMode(); }}
+              className={cn(
+                "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all",
+                !isTestnet
+                  ? theme === "light"
+                    ? "bg-neutral-900 text-white"
+                    : "bg-white/[0.1] text-white"
+                  : theme === "light"
+                    ? "text-neutral-500 hover:bg-neutral-100"
+                    : "text-neutral-500 hover:bg-white/[0.04]",
+              )}
+            >
+              Mainnet
+            </button>
+            <button
+              onClick={() => { if (!isTestnet) toggleMode(); }}
+              className={cn(
+                "flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all",
+                isTestnet
+                  ? theme === "light"
+                    ? "bg-amber-500 text-white"
+                    : "bg-amber-500/20 text-amber-300"
+                  : theme === "light"
+                    ? "text-neutral-500 hover:bg-neutral-100"
+                    : "text-neutral-500 hover:bg-white/[0.04]",
+              )}
+            >
+              Testnet
+            </button>
+          </div>
+
+          {/* Chain list */}
+          <div className="max-h-64 overflow-y-auto py-1">
+            {activeChainIds.map((id) => {
+              const meta = chainMeta[id];
+              if (!meta) return null;
+              const isActive = walletChainId === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => selectChain(id)}
+                  className={cn(
+                    "flex items-center gap-3 w-full px-3 py-2 text-sm transition-colors text-left",
+                    isActive
+                      ? theme === "light"
+                        ? "bg-neutral-100 text-neutral-900"
+                        : "bg-white/[0.06] text-white"
+                      : theme === "light"
+                        ? "text-neutral-700 hover:bg-neutral-50"
+                        : "text-neutral-300 hover:bg-white/[0.04]",
+                  )}
+                >
+                  {/* Chain icon — colored dot with short label */}
+                  <div className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-lg text-[9px] font-bold shrink-0",
+                    isActive
+                      ? "bg-moon-gradient text-white"
+                      : theme === "light"
+                        ? "bg-neutral-100 text-neutral-500"
+                        : "bg-white/[0.04] text-neutral-500",
+                  )}>
+                    {meta.shortLabel.slice(0, 3)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{meta.label}</p>
+                    <p className="text-[10px] text-neutral-500">{meta.nativeSymbol} · Chain {id}</p>
+                  </div>
+                  {isActive && (
+                    <Check className="h-4 w-4 text-emerald-400 shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Footer hint */}
+          <div className={cn(
+            "px-3 py-2 border-t text-[10px] text-neutral-500",
+            theme === "light" ? "border-neutral-100" : "border-white/[0.04]",
+          )}>
+            {address
+              ? "Selecting a chain will prompt your wallet to switch."
+              : "Connect wallet to switch chains."}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Wallet Button (single, no duplication) ───────────────────────── */
 function WalletButton() {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
@@ -243,20 +381,17 @@ function WalletButton() {
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  // Not connected → show RainbowKit ConnectButton only
   if (!isConnected || !address) {
     return <ConnectButton showBalance={false} chainStatus="icon" />;
   }
 
-  const meta = chainMeta[chainId];
+  const meta = chainId ? chainMeta[chainId] : undefined;
   const menuItems = [
     { to: "/claim", label: "Claim Fees", icon: Gift },
     { to: "/referral", label: "Referrals", icon: Users },
@@ -264,7 +399,6 @@ function WalletButton() {
 
   return (
     <div className="relative" ref={ref}>
-      {/* Single button: avatar + address + chevron */}
       <button
         onClick={() => setOpen((v) => !v)}
         className={cn(
@@ -274,30 +408,21 @@ function WalletButton() {
             : "border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]",
         )}
       >
-        {/* Wallet avatar — gradient circle with first 2 chars of address */}
         <div className="relative shrink-0">
           <div className="absolute inset-0 rounded-full bg-moon-gradient opacity-40 blur-[3px]" />
           <div className="relative h-7 w-7 rounded-full bg-moon-gradient flex items-center justify-center text-[10px] font-bold text-white">
             {address.slice(2, 4).toUpperCase()}
           </div>
         </div>
-
-        {/* Address (hidden on mobile) */}
         <span className={cn(
           "hidden sm:inline font-mono text-xs",
           theme === "light" ? "text-neutral-700" : "text-neutral-300",
         )}>
           {shortenAddress(address, 4)}
         </span>
-
-        {/* Chain indicator dot */}
         {meta && (
-          <span
-            className="h-2 w-2 rounded-full shrink-0 bg-moon-400"
-            title={meta.label}
-          />
+          <span className="h-2 w-2 rounded-full shrink-0 bg-moon-400" title={meta.label} />
         )}
-
         <ChevronDown className={cn(
           "h-3.5 w-3.5 transition-transform shrink-0",
           theme === "light" ? "text-neutral-400" : "text-neutral-500",
@@ -305,7 +430,6 @@ function WalletButton() {
         )} />
       </button>
 
-      {/* Dropdown menu */}
       {open && (
         <div
           className={cn(
@@ -315,7 +439,6 @@ function WalletButton() {
               : "bg-ink-900 border-white/[0.08]",
           )}
         >
-          {/* Wallet address header */}
           <div className={cn(
             "px-4 py-3 border-b",
             theme === "light" ? "border-neutral-100" : "border-white/[0.04]",
@@ -326,19 +449,12 @@ function WalletButton() {
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] uppercase tracking-wider text-neutral-500">Connected</p>
-                <p className="text-xs font-mono truncate">
-                  {shortenAddress(address, 5)}
-                </p>
+                <p className="text-xs font-mono truncate">{shortenAddress(address, 5)}</p>
               </div>
             </div>
-            {meta && (
-              <p className="mt-1.5 text-[10px] text-neutral-500">
-                {meta.label}
-              </p>
-            )}
+            {meta && <p className="mt-1.5 text-[10px] text-neutral-500">{meta.label}</p>}
           </div>
 
-          {/* Menu items */}
           {menuItems.map((item) => {
             const active = pathname === item.to;
             const Icon = item.icon;
@@ -364,13 +480,9 @@ function WalletButton() {
             );
           })}
 
-          {/* Disconnect */}
           <div className={cn("border-t", theme === "light" ? "border-neutral-100" : "border-white/[0.04]")}>
             <button
-              onClick={() => {
-                disconnect();
-                setOpen(false);
-              }}
+              onClick={() => { disconnect(); setOpen(false); }}
               className={cn(
                 "flex w-full items-center gap-2.5 px-4 py-2.5 text-sm transition-colors",
                 theme === "light"
