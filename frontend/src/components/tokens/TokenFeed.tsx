@@ -14,8 +14,9 @@ type Sort = "trending" | "new" | "graduated";
 export function TokenFeed() {
   const { mode } = useNetworkMode();
   const { isOnline } = useBackendHealth();
-  const [sort, setSort] = useState<Sort>("trending");
+  const [sort, setSort] = useState<Sort>("new");
 
+  // useTokens now auto-falls back to on-chain reads if backend is offline
   const { data, isLoading, isError } = useTokens();
 
   const sorted = useMemo(() => {

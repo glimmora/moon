@@ -4,7 +4,8 @@ import { getContracts } from "@/config/contracts";
 import { moonFactoryAbi } from "@/abi/MoonFactory";
 import { api } from "@/services/api";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
-import type { Log } from "viem";
+import { moonChains } from "@/config/chains";
+import { createPublicClient, http, parseEventLogs } from "viem";
 
 export interface TokenListItem {
   address: string;
@@ -24,33 +25,29 @@ export interface TokenListItem {
   graduated: boolean;
   creator: string;
   curve?: string;
-  realTokenReserves?: string;
-  isGraduated?: boolean;
-  holderCount?: number;
 }
 
 /**
- * Fetch tokens — tries backend API first, falls back to on-chain reads
- * from the factory contract if backend is offline or returns empty.
+ * Fetch tokens — tries backend API first, falls back to on-chain reads.
  */
 export function useTokens(opts?: { sort?: string; chainId?: number; includeGraduated?: boolean }) {
   const chainId = opts?.chainId;
   const { isOnline } = useBackendHealth();
 
   return useQuery<TokenListItem[]>({
-    queryKey: ["tokens", chainId, opts?.sort, opts?.includeGraduated, isOnline],
+    queryKey: ["tokens-v2", chainId, isOnline],
     queryFn: async () => {
-      // Try backend API first
+      // Try backend first
       if (isOnline) {
         try {
           const tokens = await api.getTokens(chainId);
           if (tokens && tokens.length > 0) return tokens;
         } catch {
-          // Backend failed — fall through to on-chain
+          // fall through
         }
       }
 
-      // Fallback: read tokens directly from factory contracts on-chain
+      // On-chain fallback: read allTokensLength then allTokens(i) for each
       return await fetchTokensOnChain(chainId);
     },
     refetchInterval: 15_000,
@@ -58,102 +55,129 @@ export function useTokens(opts?: { sort?: string; chainId?: number; includeGradu
   });
 }
 
-/**
- * Read tokens directly from factory contracts via viem public client.
- * This works even when backend is offline.
- */
+/** Read tokens directly from factory — uses allTokens(i) per index. */
 async function fetchTokensOnChain(filterChainId?: number): Promise<TokenListItem[]> {
-  const { moonChains } = await import("@/config/chains");
-  const { getContracts } = await import("@/config/contracts");
-  const viem = await import("viem");
-  const { createPublicClient, http, parseEventLogs } = viem;
-
   const tokens: TokenListItem[] = [];
 
-  // Determine which chains to scan
   const chainsToScan = filterChainId
     ? moonChains.filter((c) => c.id === filterChainId)
     : moonChains;
 
-  for (const chain of chainsToScan) {
-    const contracts = getContracts(chain.id);
-    if (!contracts?.factory || contracts.factory === "0x0000000000000000000000000000000000000000") continue;
+  await Promise.all(
+    chainsToScan.map(async (chain) => {
+      const contracts = getContracts(chain.id);
+      if (!contracts?.factory || contracts.factory === "0x0000000000000000000000000000000000000000") return;
 
-    const client = createPublicClient({
-      chain: { id: chain.id, name: chain.name, nativeCurrency: chain.nativeCurrency, rpcUrls: chain.rpcUrls },
-      transport: http(),
-    });
+      const client = createPublicClient({
+        chain: {
+          id: chain.id,
+          name: chain.name,
+          nativeCurrency: chain.nativeCurrency as { name: string; symbol: string; decimals: number },
+          rpcUrls: chain.rpcUrls as { default: { http: string[] } },
+        },
+        transport: http(),
+      });
 
-    try {
-      // Read allTokensLength
-      const length = await client.readContract({
-        address: contracts.factory as `0x${string}`,
-        abi: moonFactoryAbi,
-        functionName: "allTokensLength",
-      }) as bigint;
+      try {
+        // 1. Get token count
+        const length = (await client.readContract({
+          address: contracts.factory as `0x${string}`,
+          abi: moonFactoryAbi,
+          functionName: "allTokensLength",
+        })) as bigint;
 
-      if (length === 0n) continue;
+        if (length === 0n) return;
 
-      // Fetch TokenCreated events from recent blocks (last ~10000 blocks)
-      const currentBlock = await client.getBlockNumber();
-      const fromBlock = currentBlock > 10000n ? currentBlock - 10000n : 0n;
+        // 2. Get TokenCreated events (more efficient than N readContract calls)
+        try {
+          const currentBlock = await client.getBlockNumber();
+          const fromBlock = currentBlock > 50000n ? currentBlock - 50000n : 0n;
 
-      const logs = await client.getLogs({
-        address: contracts.factory as `0x${string}`,
-        event: moonFactoryAbi.find((a) => a.type === "event" && a.name === "TokenCreated"),
-        fromBlock,
-        toBlock: "latest",
-      }) as Log[];
+          const logs = await client.getLogs({
+            address: contracts.factory as `0x${string}`,
+            event: moonFactoryAbi.find((a) => a.type === "event" && a.name === "TokenCreated"),
+            fromBlock,
+            toBlock: "latest",
+          });
 
-      const parsed = parseEventLogs({ abi: moonFactoryAbi, logs: logs as never });
+          const parsed = parseEventLogs({ abi: moonFactoryAbi, logs: logs as never });
 
-      for (const log of parsed) {
-        if (log.eventName !== "TokenCreated") continue;
-        const args = log.args as unknown as {
-          token: string;
-          curve: string;
-          creator: string;
-          name: string;
-          symbol: string;
-          supplyTier: number;
-          curveShape: number;
-          totalSupply: bigint;
-          imageUrl: string;
-          description: string;
-        };
-        tokens.push({
-          address: args.token,
-          chainId: chain.id,
-          name: args.name,
-          symbol: args.symbol,
-          imageUrl: args.imageUrl,
-          description: args.description,
-          supplyTier: args.supplyTier,
-          curveShape: args.curveShape,
-          totalSupply: args.totalSupply.toString(),
-          priceUsd: 0,
-          marketCapUsd: 0,
-          holders: 0,
-          volume24h: 0,
-          createdAt: Date.now(),
-          graduated: false,
-          creator: args.creator,
-          curve: args.curve,
-        });
+          for (const log of parsed) {
+            if (log.eventName !== "TokenCreated") continue;
+            const args = log.args as unknown as {
+              token: string; curve: string; creator: string;
+              name: string; symbol: string;
+              supplyTier: number; curveShape: number;
+              totalSupply: bigint; imageUrl: string; description: string;
+            };
+            tokens.push({
+              address: args.token,
+              chainId: chain.id,
+              name: args.name,
+              symbol: args.symbol,
+              imageUrl: args.imageUrl,
+              description: args.description,
+              supplyTier: args.supplyTier,
+              curveShape: args.curveShape,
+              totalSupply: args.totalSupply.toString(),
+              priceUsd: 0,
+              marketCapUsd: 0,
+              holders: 0,
+              volume24h: 0,
+              createdAt: Date.now(),
+              graduated: false,
+              creator: args.creator,
+              curve: args.curve,
+            });
+          }
+        } catch {
+          // Event query failed (RPC doesn't support logs or no archive) —
+          // fallback: read allTokens(i) one by one
+          const maxRead = Math.min(Number(length), 50);
+          for (let i = 0; i < maxRead; i++) {
+            try {
+              const tokenAddr = (await client.readContract({
+                address: contracts.factory as `0x${string}`,
+                abi: moonFactoryAbi,
+                functionName: "allTokens",
+                args: [BigInt(i)],
+              })) as string;
+
+              tokens.push({
+                address: tokenAddr,
+                chainId: chain.id,
+                name: `Token #${i}`,
+                symbol: "???",
+                imageUrl: "",
+                description: "",
+                supplyTier: 0,
+                curveShape: 0,
+                totalSupply: "0",
+                priceUsd: 0,
+                marketCapUsd: 0,
+                holders: 0,
+                volume24h: 0,
+                createdAt: Date.now(),
+                graduated: false,
+                creator: "",
+                curve: "",
+              });
+            } catch {
+              break;
+            }
+          }
+        }
+      } catch {
+        // RPC failed for this chain — skip
       }
-    } catch {
-      // Skip this chain if RPC fails
-    }
-  }
+    }),
+  );
 
   return tokens;
 }
 
 export type TokenSort = "newest" | "trending" | "gainers" | "volume" | "graduated";
 
-/**
- * Read the on-chain count of tokens created on a given factory.
- */
 export function useTokensLength(chainId: number) {
   const contracts = getContracts(chainId);
   return useReadContract({
@@ -165,9 +189,6 @@ export function useTokensLength(chainId: number) {
   });
 }
 
-/**
- * Read token address by index from a factory.
- */
 export function useTokenByIndex(chainId: number, index: number) {
   const contracts = getContracts(chainId);
   return useReadContract({
@@ -180,9 +201,6 @@ export function useTokenByIndex(chainId: number, index: number) {
   });
 }
 
-/**
- * Watchlist stored in localStorage.
- */
 const WATCH_KEY = "moon.fun.watchlist";
 
 export function useWatchlist() {
