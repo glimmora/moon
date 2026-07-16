@@ -158,27 +158,25 @@ EOF
 
   # Generate Prisma client + push schema
   if [ -f "prisma/schema.prisma" ]; then
-    info "Generating Prisma client…"
-    npx prisma generate > "$LOG_DIR/prisma.log" 2>&1 || {
-      err "prisma generate failed:"
-      cat "$LOG_DIR/prisma.log"
-      exit 1
-    }
-
-    # Test database connectivity before pushing schema
+    # Read DB provider from .env
     local db_provider=$(grep -E "^DATABASE_PROVIDER=" .env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || echo "postgresql")
     local db_url=$(grep -E "^DATABASE_URL=" .env 2>/dev/null | cut -d= -f2- | tr -d '[:space:]')
 
+    # If sqlite, sed-swap the provider in schema.prisma (Prisma doesn't allow env() for provider)
+    if [ "$db_provider" = "sqlite" ]; then
+      info "Swapping schema.prisma provider to sqlite…"
+      sed -i.bak 's/provider = "postgresql"/provider = "sqlite"/' prisma/schema.prisma
+    fi
+
+    # Test Postgres connectivity before pushing schema
     if [ "$db_provider" = "postgresql" ]; then
       info "Testing Postgres connection…"
-      # Extract host, port, user, db from URL: postgresql://user:pass@host:port/db
       local pg_user=$(echo "$db_url" | sed -n 's|postgresql://\([^:]*\):.*|\1|p')
       local pg_pass=$(echo "$db_url" | sed -n 's|postgresql://[^:]*:\([^@]*\)@.*|\1|p')
       local pg_host=$(echo "$db_url" | sed -n 's|.*@\([^:]*\):.*|\1|p')
       local pg_port=$(echo "$db_url" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
       local pg_db=$(echo "$db_url" | sed -n 's|.*/\([^?]*\).*|\1|p')
 
-      # Try connecting with psql
       if command -v psql >/dev/null 2>&1; then
         PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" -c "SELECT 1;" > /dev/null 2>&1
         if [ $? -ne 0 ]; then
@@ -201,11 +199,20 @@ EOF
           echo ""
           exit 1
         fi
-        info "Postgres connection OK ✓"
+        info "Postgres connection OK"
       else
         warn "psql not installed — skipping connection test"
       fi
     fi
+
+    info "Generating Prisma client…"
+    npx prisma generate > "$LOG_DIR/prisma.log" 2>&1 || {
+      err "prisma generate failed:"
+      cat "$LOG_DIR/prisma.log"
+      # Restore schema if we swapped it
+      [ -f "prisma/schema.prisma.bak" ] && mv prisma/schema.prisma.bak prisma/schema.prisma
+      exit 1
+    }
 
     info "Pushing schema to database…"
     npx prisma db push --accept-data-loss > "$LOG_DIR/prisma.log" 2>&1
@@ -215,9 +222,17 @@ EOF
       cat "$LOG_DIR/prisma.log"
       echo ""
       echo "${YELLOW}Full log: $LOG_DIR/prisma.log${NC}"
+      # Restore schema if we swapped it
+      [ -f "prisma/schema.prisma.bak" ] && mv prisma/schema.prisma.bak prisma/schema.prisma
       exit 1
     fi
-    info "Schema pushed successfully ✓"
+    info "Schema pushed successfully"
+
+    # Restore schema.prisma if we swapped it for sqlite
+    if [ "$db_provider" = "sqlite" ] && [ -f "prisma/schema.prisma.bak" ]; then
+      mv prisma/schema.prisma.bak prisma/schema.prisma
+      info "Restored schema.prisma to postgresql"
+    fi
   fi
 
   nohup ./node_modules/.bin/tsx watch src/index.ts \

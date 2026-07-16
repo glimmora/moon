@@ -1,16 +1,16 @@
 // moon.fun backend Prisma schema.
-// Database: PostgreSQL 16 (production) or SQLite (local dev fallback).
+// Database: PostgreSQL 16 (production).
 //
-// The provider is read from the DATABASE_PROVIDER env var (default: postgresql).
-// `./scripts/dev.sh` sets DATABASE_PROVIDER=sqlite when falling back to a
-// local file database; production sets DATABASE_PROVIDER=postgresql.
+// For local dev without Postgres, `./scripts/dev.sh` will auto-swap the
+// provider to 'sqlite' via sed before running prisma generate/push, then
+// restore it afterwards. Don't use env() for provider — Prisma doesn't allow it.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = env("DATABASE_PROVIDER")
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
