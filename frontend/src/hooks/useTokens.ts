@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAccount, useReadContract } from "wagmi";
 import { getContracts } from "@/config/contracts";
 import { moonFactoryAbi } from "@/abi/MoonFactory";
+import { moonTokenAbi } from "@/abi/MoonToken";
 import { api } from "@/services/api";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
 import { moonChains } from "@/config/chains";
@@ -25,6 +26,9 @@ export interface TokenListItem {
   graduated: boolean;
   creator: string;
   curve?: string;
+  realTokenReserves?: string;
+  isGraduated?: boolean;
+  holderCount?: number;
 }
 
 /**
@@ -35,7 +39,7 @@ export function useTokens(opts?: { sort?: string; chainId?: number; includeGradu
   const { isOnline } = useBackendHealth();
 
   return useQuery<TokenListItem[]>({
-    queryKey: ["tokens-v2", chainId, isOnline],
+    queryKey: ["tokens-v3", chainId, isOnline],
     queryFn: async () => {
       // Try backend first
       if (isOnline) {
@@ -47,7 +51,7 @@ export function useTokens(opts?: { sort?: string; chainId?: number; includeGradu
         }
       }
 
-      // On-chain fallback: read allTokensLength then allTokens(i) for each
+      // On-chain fallback
       return await fetchTokensOnChain(chainId);
     },
     refetchInterval: 15_000,
@@ -55,7 +59,7 @@ export function useTokens(opts?: { sort?: string; chainId?: number; includeGradu
   });
 }
 
-/** Read tokens directly from factory — uses allTokens(i) per index. */
+/** Read tokens from factory contracts — events first, then per-index reads. */
 async function fetchTokensOnChain(filterChainId?: number): Promise<TokenListItem[]> {
   const tokens: TokenListItem[] = [];
 
@@ -88,10 +92,12 @@ async function fetchTokensOnChain(filterChainId?: number): Promise<TokenListItem
 
         if (length === 0n) return;
 
-        // 2. Get TokenCreated events (more efficient than N readContract calls)
+        // 2. Try TokenCreated events (fast, gets all metadata)
+        let eventSuccess = false;
         try {
           const currentBlock = await client.getBlockNumber();
-          const fromBlock = currentBlock > 50000n ? currentBlock - 50000n : 0n;
+          // Use smaller range to avoid RPC limits (5000 blocks)
+          const fromBlock = currentBlock > 5000n ? currentBlock - 5000n : 0n;
 
           const logs = await client.getLogs({
             address: contracts.factory as `0x${string}`,
@@ -130,11 +136,16 @@ async function fetchTokensOnChain(filterChainId?: number): Promise<TokenListItem
               curve: args.curve,
             });
           }
+          eventSuccess = tokens.length > 0;
         } catch {
-          // Event query failed (RPC doesn't support logs or no archive) —
-          // fallback: read allTokens(i) one by one
-          const maxRead = Math.min(Number(length), 50);
-          for (let i = 0; i < maxRead; i++) {
+          // Event query failed — use per-index reads below
+        }
+
+        // 3. Fallback: read allTokens(i) + fetch metadata per token
+        if (!eventSuccess) {
+          const maxRead = Math.min(Number(length), 20);
+          const tokenAddresses: string[] = [];
+          for (let i = Number(length) - 1; i >= Math.max(0, Number(length) - maxRead); i--) {
             try {
               const tokenAddr = (await client.readContract({
                 address: contracts.factory as `0x${string}`,
@@ -142,17 +153,31 @@ async function fetchTokensOnChain(filterChainId?: number): Promise<TokenListItem
                 functionName: "allTokens",
                 args: [BigInt(i)],
               })) as string;
+              tokenAddresses.push(tokenAddr);
+            } catch { break; }
+          }
+
+          // Batch: read name, symbol, supplyTier from each token contract
+          await Promise.all(tokenAddresses.map(async (tokenAddr) => {
+            try {
+              const [name, symbol, totalSupplyInit, supplyTier, curveShape] = await Promise.all([
+                client.readContract({ address: tokenAddr as `0x${string}`, abi: moonTokenAbi, functionName: "name" }),
+                client.readContract({ address: tokenAddr as `0x${string}`, abi: moonTokenAbi, functionName: "symbol" }),
+                client.readContract({ address: tokenAddr as `0x${string}`, abi: moonTokenAbi, functionName: "totalSupplyInit" }),
+                client.readContract({ address: tokenAddr as `0x${string}`, abi: moonTokenAbi, functionName: "supplyTier" }),
+                client.readContract({ address: tokenAddr as `0x${string}`, abi: moonTokenAbi, functionName: "curveShape" }),
+              ]);
 
               tokens.push({
                 address: tokenAddr,
                 chainId: chain.id,
-                name: `Token #${i}`,
-                symbol: "???",
+                name: name as string,
+                symbol: symbol as string,
                 imageUrl: "",
                 description: "",
-                supplyTier: 0,
-                curveShape: 0,
-                totalSupply: "0",
+                supplyTier: supplyTier as number,
+                curveShape: curveShape as number,
+                totalSupply: (totalSupplyInit as bigint).toString(),
                 priceUsd: 0,
                 marketCapUsd: 0,
                 holders: 0,
@@ -163,9 +188,9 @@ async function fetchTokensOnChain(filterChainId?: number): Promise<TokenListItem
                 curve: "",
               });
             } catch {
-              break;
+              // skip this token
             }
-          }
+          }));
         }
       } catch {
         // RPC failed for this chain — skip

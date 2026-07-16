@@ -206,16 +206,62 @@ export function Create() {
               </div>
             )}
 
-            {confirmed && (
-              <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-300 animate-fade-in">
-                <CheckCircle2 className="h-4 w-4" /> Token created!{" "}
-                <Link to="/" className="underline ml-1">View it in the explorer →</Link>
+            {/* Multi-step progress during launch */}
+            {pending && (
+              <div className="rounded-xl border border-moon-500/20 bg-moon-500/5 p-4 space-y-3 animate-fade-in">
+                <div className="flex items-center gap-2 text-sm font-medium text-moon-300">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Launching {form.name || "token"}…
+                </div>
+                <div className="space-y-2">
+                  <ProgressStep done={false} active label="Preparing transaction…" />
+                  <ProgressStep done={false} active={false} label="Waiting for wallet confirmation…" />
+                  <ProgressStep done={false} active={false} label="Confirming on blockchain…" />
+                  <ProgressStep done={false} active={false} label="Token live!" />
+                </div>
               </div>
             )}
 
-            <button type="submit" disabled={pending || !address} className={cn("btn-primary w-full !py-3 text-base", pending && "opacity-70")}>
-              {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Rocket className="h-5 w-5" />}
-              {pending ? "Launching…" : "Launch Token"}
+            {confirmed && !pending && (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-2 animate-fade-in">
+                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-300">
+                  <CheckCircle2 className="h-5 w-5" />
+                  Token launched successfully! 🎉
+                </div>
+                <p className="text-xs text-emerald-400/70">
+                  {form.name} (${form.symbol}) is now live on {activeChain?.label ?? "the network"}.
+                </p>
+                <Link to="/" className="btn-success w-full !py-2 text-sm mt-2">
+                  View in Dashboard →
+                </Link>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={pending || !address}
+              className={cn(
+                "btn-primary w-full !py-3 text-base transition-all",
+                pending && "opacity-50 cursor-not-allowed",
+                confirmed && "btn-success",
+              )}
+            >
+              {pending ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Launching…
+                </>
+              ) : confirmed ? (
+                <>
+                  <CheckCircle2 className="h-5 w-5" />
+                  Launched! Create another?
+                </>
+              ) : (
+                <>
+                  <Rocket className="h-5 w-5" />
+                  Launch Token
+                </>
+              )}
             </button>
           </form>
         </div>
@@ -352,5 +398,30 @@ function CurvePreview({ shape, active }: { shape: number; active: boolean }) {
         </linearGradient>
       </defs>
     </svg>
+  );
+}
+
+function ProgressStep({ done, active, label }: { done: boolean; active: boolean; label: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className={cn(
+        "flex h-5 w-5 items-center justify-center rounded-full shrink-0 transition-all",
+        done ? "bg-emerald-500 text-white" : active ? "bg-moon-500 text-white animate-pulse" : "bg-white/[0.06] text-neutral-600",
+      )}>
+        {done ? (
+          <CheckCircle2 className="h-3 w-3" />
+        ) : active ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : (
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+        )}
+      </div>
+      <span className={cn(
+        "text-xs transition-colors",
+        done ? "text-emerald-400" : active ? "text-moon-300 font-medium" : "text-neutral-600",
+      )}>
+        {label}
+      </span>
+    </div>
   );
 }
