@@ -172,19 +172,24 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         (tokensOut, fee) = _getBuyOut(quoteAmountIn);
         if (tokensOut < minTokensOut) revert InsufficientQuote();
 
+        // AUDIT-FIX CRITICAL: `fee` returned by _getBuyOut is a FRACTION (1e18-based, e.g. 0.99e18 = 99%),
+        // NOT an absolute amount. Compute the absolute fee amount here.
+        uint256 feeAmount = (quoteAmountIn * fee) / 1e18;
+
         // ── Effects ──────────────────────────────────────────────
         s_realTokenReserves += tokensOut;
         // AUDIT-FIX H-2: Add quoteAfterFee (not quoteAmountIn) to reserves.
         // Fee is sent out via _distributeFee, so only the after-fee portion stays in the curve.
-        s_realQuoteReserves += (quoteAmountIn - fee);
+        s_realQuoteReserves += (quoteAmountIn - feeAmount);
 
         // ── Interactions ─────────────────────────────────────────
         // 1) Mint tokens to the buyer (Option B).
         IMoonToken(s_token).mint(msg.sender, tokensOut);
 
         // 2) Distribute fees (all wrapped in try/catch internally).
-        if (fee > 0) {
-            _distributeFee(fee, referrer);
+        // AUDIT-FIX CRITICAL: pass feeAmount (absolute), not fee (fraction).
+        if (feeAmount > 0) {
+            _distributeFee(feeAmount, referrer);
         }
 
         // Check graduation threshold.
@@ -192,7 +197,8 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
             _graduate();
         }
 
-        emit Bought(msg.sender, quoteAmountIn, tokensOut, fee, price());
+        // AUDIT-FIX CRITICAL: emit feeAmount (absolute), not fee (fraction).
+        emit Bought(msg.sender, quoteAmountIn, tokensOut, feeAmount, price());
     }
 
     /* ───────────────────────  Sell  ───────────────────────────── */
@@ -212,6 +218,10 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         (uint256 grossQuoteOut, uint256 fee, uint256 netQuoteOut) = _getSellOut(tokenAmountIn);
         quoteOut = netQuoteOut;
         if (quoteOut < minQuoteOut) revert InsufficientTokens();
+
+        // AUDIT-FIX CRITICAL: `fee` is a FRACTION (1e18-based). Compute absolute fee amount.
+        // The fee is taken from the GROSS quote out (before net deduction).
+        uint256 feeAmount = (grossQuoteOut * fee) / 1e18;
 
         // ── Effects ──────────────────────────────────────────────
         // Decrement by GROSS quote out (pre-fee), per audited spec.
@@ -233,14 +243,16 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
 
         // 2) Distribute fees (all try/catch).
         // AUDIT-FIX H-1: Forward referrer to _distributeFee (was hardcoded address(0))
-        if (fee > 0) {
-            _distributeFee(fee, referrer);
+        // AUDIT-FIX CRITICAL: pass feeAmount (absolute), not fee (fraction).
+        if (feeAmount > 0) {
+            _distributeFee(feeAmount, referrer);
         }
 
         // 3) Burn seller tokens LAST (CEI).
         IMoonToken(s_token).burnFrom(msg.sender, tokenAmountIn);
 
-        emit Sold(msg.sender, tokenAmountIn, quoteOut, fee, price());
+        // AUDIT-FIX CRITICAL: emit feeAmount (absolute), not fee (fraction).
+        emit Sold(msg.sender, tokenAmountIn, quoteOut, feeAmount, price());
     }
 
     /* ───────────────────────  Graduate  ───────────────────────── */
@@ -378,17 +390,22 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         // Remaining share → FeeRouter (40% dev / 30% burn / 30% treasury).
         uint256 routerShare = feeAmount - creatorShare - referralShare;
         if (routerShare > 0 && s_feeRouter != address(0)) {
-            // AUDIT-FIX M-3: Check ETH transfer result
+            // AUDIT-FIX CRITICAL: For native ETH, call distribute WITH {value: routerShare}
+            // so feeRouter.distribute's `require(msg.value == amount)` check passes.
+            // For ERC-20, transfer first then call distribute (which pulls via transferFrom).
             if (quote == address(0)) {
-                (bool ok,) = payable(s_feeRouter).call{value: routerShare}("");
-                if (!ok) return; // can't distribute, abort silently
+                try IFeeRouter(s_feeRouter).distribute{value: routerShare}(quote, routerShare) {
+                    // success
+                } catch {
+                    // Non-blocking: ETH stays in curve for rescue.
+                }
             } else {
                 IERC20(quote).safeTransfer(s_feeRouter, routerShare);
-            }
-            try IFeeRouter(s_feeRouter).distribute(quote, routerShare) {
-                // success
-            } catch {
-                // Non-blocking.
+                try IFeeRouter(s_feeRouter).distribute(quote, routerShare) {
+                    // success
+                } catch {
+                    // Non-blocking.
+                }
             }
         }
     }

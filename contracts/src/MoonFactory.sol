@@ -152,6 +152,13 @@ contract MoonFactory is AccessControl, IMoonFactory {
         try ICreatorFeeVault(creatorFeeVault).grantAccruerRole(curve) {} catch {}
         try IReferralRegistry(referralRegistry).grantReferrerRole(curve) {} catch {}
 
+        // AUDIT-FIX CRITICAL: Grant the curve MINTER_ROLE on the token so it can
+        // mint (on buy) and burnFrom (on sell). The factory has MINTER_ROLE from
+        // initialize(), and as MINTER it can grant the role to the curve.
+        try IMoonToken(token).grantMinterRole(curve) {} catch {}
+        // Also exempt the curve from token transfer limits (max-tx/max-hold/cooldown).
+        try IMoonToken(token).setExempt(curve, true) {} catch {}
+
         allTokens.push(token);
 
         emit TokenCreated(

@@ -71,4 +71,8 @@ interface IMoonToken is IERC20 {
 
     /// @notice Set exempt status for an account (factory/bonding curve / DEX pair / dead).
     function setExempt(address account, bool exempt) external;
+
+    /// @notice Grant MINTER_ROLE to another address (e.g. the bonding curve clone).
+    /// @dev AUDIT-FIX CRITICAL: Factory uses this to grant MINTER_ROLE to the curve.
+    function grantMinterRole(address account) external;
 }

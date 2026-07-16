@@ -175,6 +175,14 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
         emit ExemptSet(account, exempt);
     }
 
+    /// @inheritdoc IMoonToken
+    /// @dev AUDIT-FIX CRITICAL: Allows the factory (MINTER) to grant MINTER_ROLE
+    ///      to the bonding curve clone, so the curve can mint (on buy) and
+    ///      burnFrom (on sell).
+    function grantMinterRole(address account) external override onlyRole(MINTER_ROLE) {
+        _grantRole(MINTER_ROLE, account);
+    }
+
     /* ───────────────────────  Getters  ────────────────────────── */
 
     function factory() external view returns (address) {
