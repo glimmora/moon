@@ -156,12 +156,68 @@ EOF
     info "Database URL: $dburl"
   fi
 
-  # Generate Prisma client + push schema (sqlite-compatible)
+  # Generate Prisma client + push schema
   if [ -f "prisma/schema.prisma" ]; then
     info "Generating Prisma client…"
-    npx prisma generate > "$LOG_DIR/prisma.log" 2>&1
+    npx prisma generate > "$LOG_DIR/prisma.log" 2>&1 || {
+      err "prisma generate failed:"
+      cat "$LOG_DIR/prisma.log"
+      exit 1
+    }
+
+    # Test database connectivity before pushing schema
+    local db_provider=$(grep -E "^DATABASE_PROVIDER=" .env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || echo "postgresql")
+    local db_url=$(grep -E "^DATABASE_URL=" .env 2>/dev/null | cut -d= -f2- | tr -d '[:space:]')
+
+    if [ "$db_provider" = "postgresql" ]; then
+      info "Testing Postgres connection…"
+      # Extract host, port, user, db from URL: postgresql://user:pass@host:port/db
+      local pg_user=$(echo "$db_url" | sed -n 's|postgresql://\([^:]*\):.*|\1|p')
+      local pg_pass=$(echo "$db_url" | sed -n 's|postgresql://[^:]*:\([^@]*\)@.*|\1|p')
+      local pg_host=$(echo "$db_url" | sed -n 's|.*@\([^:]*\):.*|\1|p')
+      local pg_port=$(echo "$db_url" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
+      local pg_db=$(echo "$db_url" | sed -n 's|.*/\([^?]*\).*|\1|p')
+
+      # Try connecting with psql
+      if command -v psql >/dev/null 2>&1; then
+        PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" -c "SELECT 1;" > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+          err "Cannot connect to Postgres at $pg_host:$pg_port/$pg_db as user '$pg_user'"
+          echo ""
+          echo "${YELLOW}Common fixes:${NC}"
+          echo "  1. Create user + database:"
+          echo "     sudo -u postgres psql -c \"CREATE USER moon WITH PASSWORD 'moon';\""
+          echo "     sudo -u postgres psql -c \"CREATE DATABASE moonfun OWNER moon;\""
+          echo "     sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE moonfun TO moon;\""
+          echo ""
+          echo "  2. Fix pg_hba.conf auth method (change 'peer' to 'md5'):"
+          echo "     sudo sed -i 's/peer/md5/g' /etc/postgresql/*/main/pg_hba.conf"
+          echo "     sudo systemctl restart postgresql"
+          echo ""
+          echo "  3. Or fall back to SQLite (no Postgres needed):"
+          echo "     Edit backend/.env:"
+          echo "       DATABASE_PROVIDER=sqlite"
+          echo "       DATABASE_URL=file:./dev.db"
+          echo ""
+          exit 1
+        fi
+        info "Postgres connection OK ✓"
+      else
+        warn "psql not installed — skipping connection test"
+      fi
+    fi
+
     info "Pushing schema to database…"
-    npx prisma db push --accept-data-loss > "$LOG_DIR/prisma.log" 2>&1 || warn "prisma db push failed (see $LOG_DIR/prisma.log)"
+    npx prisma db push --accept-data-loss > "$LOG_DIR/prisma.log" 2>&1
+    if [ $? -ne 0 ]; then
+      err "prisma db push failed. Error output:"
+      echo ""
+      cat "$LOG_DIR/prisma.log"
+      echo ""
+      echo "${YELLOW}Full log: $LOG_DIR/prisma.log${NC}"
+      exit 1
+    fi
+    info "Schema pushed successfully ✓"
   fi
 
   nohup ./node_modules/.bin/tsx watch src/index.ts \
