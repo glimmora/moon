@@ -1,11 +1,11 @@
 # moon.fun
 
-> A permissionless meme-token launchpad with multi-shape bonding curves, on-chain referrals, creator fee vaults, and a self-buyback-and-burn flywheel for the `$MOON` governance token.
+> A permissionless meme-token launchpad with bonding curves, on-chain referrals, creator fee vaults, and a self-sustaining buyback-and-burn flywheel.
 
-[![CI](https://img.shields.io/badge/CI-foundry%20%2B%20pnpm-blue)](./.github/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.24-363636.svg)](https://soliditylang.org/)
 [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FF7A13.svg)](https://getfoundry.sh/)
+[![Network](https://img.shields.io/badge/Deployed-Sepolia-9b59b6.svg)](https://sepolia.etherscan.io/address/0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3)
 
 ---
 
@@ -16,7 +16,7 @@
 A portion of every trade fee flows back to the protocol:
 
 - **40%** → Dev wallet
-- **30%** → `MoonBurner` (buyback-and-burn of `$MOON`)
+- **30%** → `MoonBurner` (buyback-and-burn)
 - **30%** → Treasury
 
 Creators earn a share of fees through `CreatorFeeVault`, and referrers earn through `ReferralRegistry` — both pull-payment to avoid reentrancy.
@@ -31,13 +31,14 @@ Creators earn a share of fees through `CreatorFeeVault`, and referrers earn thro
                     │   createToken() → Clones(MoonToken, Curve)  │
                     └───────────┬─────────────────────────────────┘
                                 │ grants CALLER_ROLE / ACCRUER_ROLE / REFERRER_ROLE
+                                │ grants MINTER_ROLE on token → curve
                 ┌───────────────┼───────────────┬──────────────────┐
                 ▼               ▼               ▼                  ▼
         ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
         │ BondingCurve │ │CreatorFeeVault│ │ReferralRegist│ │  FeeRouter   │
         │  buy/sell    │ │  accrueFees  │ │recordReferral│ │ distribute() │
         └──────┬───────┘ └──────────────┘ └──────────────┘ └──────┬───────┘
-               │ mint/burn via IMoonToken                          │
+               │ mint/burn via MINTER_ROLE                         │
                ▼                                                  ▼
         ┌──────────────┐                                  ┌──────────────┐
         │  MoonToken   │                                  │  MoonBurner  │
@@ -54,10 +55,10 @@ See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full system design.
 ```
 moon.fun/
 ├── contracts/      # Foundry project — Solidity 0.8.24 + OpenZeppelin v5
-├── frontend/       # Vite 5 + React 18 + wagmi 2 + RainbowKit 2
-├── backend/        # Node 20 + Express + Socket.io + Prisma + Postgres
+├── frontend/       # Vite 5 + React 18 + wagmi 2 + RainbowKit 2 + Tailwind 3
+├── backend/        # Node 20 + Express + Socket.io + Prisma + Postgres/SQLite
 ├── docs/           # Architecture, security, deployment, audit, API, contributing
-├── scripts/        # Dev setup, audit, deploy-all helpers
+├── scripts/        # dev.sh (launcher), audit.sh, deploy-all.sh, security-test-sepolia.sh
 └── .github/        # CI workflow
 ```
 
@@ -67,73 +68,150 @@ moon.fun/
 
 ### Prerequisites
 
-- [Node.js 20](https://nodejs.org/) (see `.nvmrc`)
-- [pnpm 9](https://pnpm.io/) (`corepack enable`)
-- [Foundry](https://book.getfoundry.sh/getting-started/installation) (`foundryup`)
-- [Docker](https://www.docker.com/) (for local Postgres + Redis)
+- [Node.js 20](https://nodejs.org/)
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) (`foundryup`) — for smart contract tests
+- [PostgreSQL](https://www.postgresql.org/) (optional — falls back to SQLite automatically)
 
-### 1. Clone & install
+### One-command dev launcher
 
 ```bash
 git clone https://github.com/glimmora/moon.git moon.fun
 cd moon.fun
-pnpm install
+./scripts/dev.sh
 ```
 
-### 2. Smart contracts
+This will:
+- Install frontend + backend dependencies (if missing)
+- Auto-detect Postgres (falls back to SQLite if not running)
+- Generate Prisma client + push schema
+- Start backend on port `4000`
+- Start frontend on port `5173`
+
+Other commands:
+```bash
+./scripts/dev.sh frontend   # frontend only
+./scripts/dev.sh backend    # backend only
+./scripts/dev.sh stop       # stop all processes
+./scripts/dev.sh status     # show running processes
+```
+
+### Manual setup (alternative)
+
+<details>
+<summary>Click to expand</summary>
 
 ```bash
+# 1. Smart contracts
 cd contracts
-forge install foundry-rs/forge-std OpenZeppelin/openzeppelin-contracts
+forge install foundry-rs/forge-std@v1.7.1 OpenZeppelin/openzeppelin-contracts@v5.0.2
 forge build
 forge test -vvv
-```
 
-### 3. Backend
-
-```bash
+# 2. Backend
 cd backend
 cp .env.example .env
-docker compose up -d          # Postgres + Redis
-pnpm dlx prisma migrate dev
-pnpm dev
-```
+# Edit .env — set DATABASE_PROVIDER=postgresql or sqlite
+npm install
+npx prisma generate
+npx prisma db push
+npm run dev
 
-### 4. Frontend
-
-```bash
+# 3. Frontend
 cd frontend
 cp .env.example .env
-pnpm dev
+npm install --legacy-peer-deps
+npm run dev
 ```
+
+</details>
+
+---
+
+## Deployed Contracts (Ethereum Sepolia)
+
+All contracts deployed and verified on-chain at block 11,285,810.
+
+| Contract | Address |
+|----------|---------|
+| MoonFactory | `0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3` |
+| FeeRouter | `0x95032e828144707e9754993e421c31dE986A3bb1` |
+| CreatorFeeVault | `0x3c67d2f9f3aA5B909332f2eF7a3862b58015345B` |
+| ReferralRegistry | `0xADB082E1AA4696bffDAD8aB754874d31E37e9Fe0` |
+| MoonBurner | `0xaca899314bd11E103779CA0a790C9b33c2b8FebA` |
+| MoonV3Concentrator | `0x17Fa6827FacD0B41Fa263ed1bC1E6D0bD73DaD30` |
+
+See [`contracts/deployments/ethereum-sepolia.json`](./contracts/deployments/ethereum-sepolia.json) for full deployment record.
 
 ---
 
 ## Supported Chains
 
-| Chain              | Chain ID | Type    |
-| ------------------ | -------- | ------- |
-| BNB Smart Chain    | 56       | mainnet |
-| Base               | 8453     | mainnet |
-| Arbitrum One       | 42161    | mainnet |
-| BSC Testnet        | 97       | testnet |
-| Base Sepolia       | 84532    | testnet |
-| Arbitrum Sepolia   | 421614   | testnet |
-| Ethereum Sepolia   | 11155111 | testnet |
+| Chain              | Chain ID | Type    | Status |
+| ------------------ | -------- | ------- | ------ |
+| Ethereum Sepolia   | 11155111 | testnet | ✅ Deployed |
+| BNB Smart Chain    | 56       | mainnet | Planned |
+| Base               | 8453     | mainnet | Planned |
+| Arbitrum One       | 42161    | mainnet | Planned |
+| BSC Testnet        | 97       | testnet | Planned |
+| Base Sepolia       | 84532    | testnet | Planned |
+| Arbitrum Sepolia   | 421614   | testnet | Planned |
+
+---
+
+## Features
+
+### Smart Contracts
+- **Tokenomics**: Mint-on-buy, burn-on-sell. No pre-mint, no rug surface.
+- **3 Curve Shapes**: Linear, Exponential (pump.fun style), Logarithmic
+- **3 Supply Tiers**: 1B, 10B, 100B tokens
+- **Anti-Sniper**: 99% fee at block 0, linear decay to 1.25% by block 6
+- **Auto-Graduation**: Tokens graduate to DEX LP at threshold; LP permanently burned
+- **Fee Distribution**: 20% creator + 10% referrer + 70% FeeRouter (40/30/30 dev/burn/treasury)
+- **Pull Payments**: Creator fees + referral rewards claimed, never pushed
+- **Access Control**: 7 roles (DEFAULT_ADMIN, OPERATOR, PAUSER, MINTER, ACCRUER, REFERRER, CALLER)
+- **EIP-1167 Clones**: Cheap per-token deployment via OpenZeppelin Clones
+
+### Frontend
+- **Modern UI**: Glassmorphism, aurora background, gradient accents, smooth animations
+- **Dark/Light Theme**: Toggle with system preference detection + localStorage persistence
+- **Toast Notifications**: Wallet connect/disconnect, chain changes, mode toggle events
+- **Auto Chain Switch**: Wallet auto-prompts switch when transacting on a different chain
+- **Pages**: Home, Explore, Create, Token Detail, Portfolio, Leaderboard, Watchlist, Claim, Referral
+- **Live Preview**: Real-time token preview on Create page
+- **Graduation Countdown**: Visual ETA to graduation on token cards
+- **Responsive**: Mobile-first with safe-area support for notched devices
+
+### Backend
+- **Multi-chain Indexer**: Polls TokenCreated, Bought, Sold, Graduated events
+- **Holder Indexing**: Periodic Transfer event scanning with per-token checkpoints
+- **Portfolio API**: Holdings, P&L, recent trades, created tokens
+- **Leaderboard API**: Top traders, creators, tokens
+- **Socket.io**: Live trade updates via token rooms
+- **Rate Limiting**: 120 req/min per IP
 
 ---
 
 ## Security
 
-- **Option B tokenomics**: `MoonToken` starts with `totalSupply = 0`. Tokens are minted on buy and burned on sell — no pre-mint, no rug surface.
 - **CEI ordering**: every external interaction in `BondingCurve.sell()` happens **after** state effects; the token `burnFrom` is the final call.
+- **Fee handling**: `_getBuyOut()`/`_getSellOut()` return fee as a fraction (1e18-based); `buy()`/`sell()` convert to absolute amount before subtraction and distribution.
+- **MINTER_ROLE grant**: Factory grants `MINTER_ROLE` to the bonding curve clone so it can mint (buy) and burnFrom (sell).
 - **`CALLER_ROLE` gating**: `FeeRouter`, `MoonBurner`, `CreatorFeeVault`, and `ReferralRegistry` only accept calls from authorized bonding curves.
-- **`try/catch` everywhere**: all three fee distribution calls in `_distributeFee()`, the DEX `addLiquidity` in `_graduate()`, and the `buybackAndBurn` self-call are wrapped so a single failing external call never reverts a trade.
+- **`try/catch` everywhere**: all fee distribution calls, DEX `addLiquidity`, and `buybackAndBurn` are wrapped so a single failing external call never reverts a trade.
 - **Pull payments**: creator and referral rewards are claimed, never pushed.
 - **Reentrancy guards** on token `_update`, curve `buy`/`sell`, and all claim functions.
-- **X-Mode anti-sniper**: 99% fee in block 0 of a token's life, decaying to 1.25% by block 6.
+- **Anti-sniper**: 99% fee in block 0 of a token's life, decaying to 1.25% by block 6.
 
-See [`docs/SECURITY.md`](./docs/SECURITY.md) and [`docs/AUDIT-CHECKLIST.md`](./docs/AUDIT-CHECKLIST.md).
+### On-Chain Test Results
+
+**28/28 tests PASS** on Ethereum Sepolia — see:
+- [`docs/TEST-REPORT-SEPOLIA-v2.md`](./docs/TEST-REPORT-SEPOLIA-v2.md) — comprehensive security + feature tests
+- [`docs/AUDIT-REPORT.md`](./docs/AUDIT-REPORT.md) — formal audit report (score: 9.5/10)
+
+Run on-chain tests:
+```bash
+./scripts/security-test-sepolia.sh
+```
 
 ---
 
