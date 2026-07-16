@@ -25,11 +25,10 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className={cn("absolute inset-0 bg-gradient-to-b from-transparent via-transparent", isLight ? "to-neutral-50" : "to-ink-950")} />
       </div>
 
-      {/* Header is always-on-top via sticky + z-50, wrapped in relative z-40 */}
-      <div className="relative z-40">
-        <Header />
-      </div>
+      {/* Header is fixed and always-on-top — no wrapper needed */}
+      <Header />
 
+      {/* Main content — z-10 to stay above background */}
       <div className="relative z-10 flex flex-col flex-1">
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-28 md:pb-12 pt-2">
           <PageTransition>{children}</PageTransition>

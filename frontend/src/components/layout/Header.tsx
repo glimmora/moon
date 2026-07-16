@@ -1,11 +1,12 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Rocket, Search, Star, Plus, Gift, Users, Command, Trophy, Wallet, Sun, Moon, Wifi, WifiOff } from "lucide-react";
+import { Rocket, Search, Star, Plus, Command, Trophy, Wallet, Sun, Moon, Gift, Users, ChevronDown, LogOut } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount, useDisconnect } from "wagmi";
 import { useNetworkMode } from "@/stores/networkMode";
 import { useTheme } from "@/stores/theme";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 const NAV = [
   { to: "/", label: "Explore", icon: Rocket },
@@ -13,22 +14,18 @@ const NAV = [
   { to: "/portfolio", label: "Portfolio", icon: Wallet },
   { to: "/create", label: "Launch", icon: Plus, highlight: true },
   { to: "/watchlist", label: "Watchlist", icon: Star },
-  { to: "/claim", label: "Claim", icon: Gift },
-  { to: "/referral", label: "Referrals", icon: Users },
 ];
 
 export function Header() {
   const { pathname } = useLocation();
   const { mode, toggle: toggleMode } = useNetworkMode();
   const { theme, toggle: toggleTheme } = useTheme();
-  const { isOnline, health } = useBackendHealth();
+  const { isOnline } = useBackendHealth();
   const navigate = useNavigate();
-  const [scrolled, setScrolled] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
+    const onScroll = () => {};
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -47,33 +44,30 @@ export function Header() {
 
   const handleModeToggle = () => {
     toggleMode();
-    // Toast is fired by useWalletEvents watcher; no need to duplicate here.
   };
 
   return (
     <>
       <header
         className={cn(
-          "sticky top-0 z-40 transition-all duration-300 safe-top",
-          scrolled
-            ? theme === "light"
-              ? "bg-white/80 backdrop-blur-xl border-b border-neutral-200"
-              : "header-blur border-b border-white/[0.06]"
-            : "bg-transparent",
+          "fixed top-0 left-0 right-0 z-50 safe-top transition-all duration-300",
+          theme === "light"
+            ? "bg-white/80 backdrop-blur-xl border-b border-neutral-200"
+            : "header-blur border-b border-white/[0.06]",
         )}
       >
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
           {/* Logo */}
           <Link to="/" className="group flex items-center gap-2.5 shrink-0">
-            <div className="relative h-9 w-9">
+            <div className="relative h-8 w-8">
               <div className="absolute inset-0 rounded-xl bg-moon-gradient opacity-80 blur-[6px] group-hover:opacity-100 transition-opacity" />
-              <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-moon-gradient shadow-glow">
-                <Rocket className="h-5 w-5 text-white" />
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-moon-gradient shadow-glow">
+                <Rocket className="h-4 w-4 text-white" />
               </div>
             </div>
             <div className="hidden sm:block">
               <span className={cn(
-                "text-lg font-bold tracking-tight font-display",
+                "text-base font-bold tracking-tight font-display",
                 theme === "light" ? "text-neutral-900" : "text-neutral-100",
               )}>
                 moon<span className="text-gradient">.fun</span>
@@ -113,14 +107,14 @@ export function Header() {
           <button
             onClick={() => setSearchOpen(true)}
             className={cn(
-              "hidden lg:flex items-center gap-2 ml-2 rounded-xl border px-3 py-2 text-sm transition-colors w-56",
+              "hidden lg:flex items-center gap-2 ml-2 rounded-xl border px-3 py-2 text-sm transition-colors w-48",
               theme === "light"
                 ? "border-neutral-200 bg-neutral-50 text-neutral-500 hover:bg-neutral-100"
                 : "border-white/[0.06] bg-white/[0.02] text-neutral-500 hover:bg-white/[0.04]",
             )}
           >
             <Search className="h-4 w-4" />
-            <span className="flex-1 text-left">Search tokens…</span>
+            <span className="flex-1 text-left">Search…</span>
             <kbd className={cn(
               "flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-mono",
               theme === "light" ? "bg-neutral-200 text-neutral-600" : "bg-white/[0.06] text-neutral-400",
@@ -131,30 +125,16 @@ export function Header() {
 
           {/* Right cluster */}
           <div className="ml-auto flex items-center gap-2">
-            {/* Backend health indicator */}
+            {/* Backend health dot — green/red only, no text */}
             <div
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors",
+                "h-2.5 w-2.5 rounded-full transition-colors",
                 isOnline
-                  ? theme === "light"
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                  : theme === "light"
-                    ? "bg-red-50 text-red-700 border border-red-200"
-                    : "bg-red-500/10 text-red-400 border border-red-500/20",
+                  ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"
+                  : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse",
               )}
-              title={isOnline ? `Backend online (${health.latency}ms)` : "Backend offline — run ./scripts/dev.sh"}
-            >
-              {isOnline ? (
-                <Wifi className="h-3 w-3" />
-              ) : (
-                <WifiOff className="h-3 w-3" />
-              )}
-              <span className="hidden sm:inline">{isOnline ? "API" : "Offline"}</span>
-              {isOnline && health.latency !== undefined && (
-                <span className="hidden md:inline opacity-60 tabular">{health.latency}ms</span>
-              )}
-            </div>
+              title={isOnline ? "Backend online" : "Backend offline"}
+            />
 
             {/* Theme toggle */}
             <button
@@ -182,21 +162,25 @@ export function Header() {
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  mode === "mainnet" ? "bg-emerald-400 shadow-glow-green" : "bg-amber-400",
+                  mode === "mainnet" ? "bg-emerald-400" : "bg-amber-400",
                 )}
               />
               {mode === "mainnet" ? "Mainnet" : "Testnet"}
             </button>
 
-            <ConnectButton showBalance={false} chainStatus="icon" />
+            {/* Wallet connect + dropdown with Claim/Referrals */}
+            <WalletWithDropdown />
           </div>
         </div>
       </header>
 
+      {/* Spacer to offset fixed header height */}
+      <div className="h-14" />
+
       {/* Command-style search modal */}
       {searchOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4 animate-fade-in"
+          className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] px-4 animate-fade-in"
           onClick={() => setSearchOpen(false)}
         >
           <div className={cn(
@@ -242,5 +226,122 @@ export function Header() {
         </div>
       )}
     </>
+  );
+}
+
+/** Wallet connect button + dropdown menu (Claim, Referrals) when connected. */
+function WalletWithDropdown() {
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const { pathname } = useLocation();
+  const { theme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  if (!isConnected) {
+    return <ConnectButton showBalance={false} chainStatus="icon" />;
+  }
+
+  const menuItems = [
+    { to: "/claim", label: "Claim Fees", icon: Gift },
+    { to: "/referral", label: "Referrals", icon: Users },
+  ];
+
+  return (
+    <div className="relative flex items-center gap-2" ref={ref}>
+      <ConnectButton showBalance={false} chainStatus="icon" accountStatus="avatar" />
+
+      {/* Dropdown trigger */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "flex items-center justify-center rounded-lg p-2 transition-colors",
+          theme === "light"
+            ? "hover:bg-neutral-100 text-neutral-600"
+            : "hover:bg-white/[0.06] text-neutral-400",
+        )}
+        aria-label="Account menu"
+      >
+        <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+      </button>
+
+      {/* Dropdown menu */}
+      {open && (
+        <div
+          className={cn(
+            "absolute top-full right-0 mt-2 w-52 rounded-xl border shadow-xl overflow-hidden animate-scale-in z-[60]",
+            theme === "light"
+              ? "bg-white border-neutral-200"
+              : "bg-ink-900 border-white/[0.08]",
+          )}
+        >
+          {/* Wallet address header */}
+          <div className={cn(
+            "px-4 py-3 border-b",
+            theme === "light" ? "border-neutral-100" : "border-white/[0.04]",
+          )}>
+            <p className="text-[10px] uppercase tracking-wider text-neutral-500">Connected</p>
+            <p className="text-xs font-mono mt-0.5">
+              {address?.slice(0, 8)}…{address?.slice(-6)}
+            </p>
+          </div>
+
+          {/* Menu items */}
+          {menuItems.map((item) => {
+            const active = pathname === item.to;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors",
+                  active
+                    ? theme === "light"
+                      ? "bg-neutral-100 text-neutral-900"
+                      : "bg-white/[0.06] text-white"
+                    : theme === "light"
+                      ? "text-neutral-700 hover:bg-neutral-50"
+                      : "text-neutral-300 hover:bg-white/[0.04]",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            );
+          })}
+
+          {/* Disconnect */}
+          <div className={cn("border-t", theme === "light" ? "border-neutral-100" : "border-white/[0.04]")}>
+            <button
+              onClick={() => {
+                disconnect();
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center gap-2.5 px-4 py-2.5 text-sm transition-colors",
+                theme === "light"
+                  ? "text-red-600 hover:bg-red-50"
+                  : "text-red-400 hover:bg-red-500/10",
+              )}
+            >
+              <LogOut className="h-4 w-4" />
+              Disconnect
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
