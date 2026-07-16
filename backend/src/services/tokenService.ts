@@ -58,7 +58,7 @@ export const tokenService = {
     });
   },
 
-  async updateMarketStats(chainId: number, address: string, stats: { priceUsd?: number; marketCapUsd?: number; holders?: number; volume24h?: number }) {
+  async updateMarketStats(chainId: number, address: string, stats: { priceUsd?: number; marketCapUsd?: number; holderCount?: number; volume24h?: number }) {
     return prisma.token.update({
       where: { chainId_address: { chainId, address } },
       data: stats,

@@ -209,7 +209,7 @@ apiRouter.get("/portfolio/:address", async (req, res, next) => {
         curveShape: t.curveShape,
         priceUsd: t.priceUsd,
         marketCapUsd: t.marketCapUsd,
-        holders: t.holders,
+        holders: t.holderCount,
         volume24h: t.volume24h,
         graduated: t.graduated,
         createdAt: t.createdAt.getTime(),
@@ -252,7 +252,7 @@ apiRouter.get("/leaderboard/creators", async (req, res, next) => {
     // Top creators by aggregate volume across their tokens.
     const top = await prisma.token.groupBy({
       by: ["creator"],
-      _sum: { volume24h: true, holders: true },
+      _sum: { volume24h: true, holderCount: true },
       _count: { id: true },
       orderBy: { _sum: { volume24h: "desc" } },
       take: limit,
@@ -262,7 +262,7 @@ apiRouter.get("/leaderboard/creators", async (req, res, next) => {
       address: r.creator,
       tokensCreated: r._count.id,
       totalVolume24h: r._sum.volume24h ?? 0,
-      totalHolders: r._sum.holders ?? 0,
+      totalHolders: r._sum.holderCount ?? 0,
     }));
     res.json(rows);
   } catch (e) {
@@ -276,7 +276,7 @@ apiRouter.get("/leaderboard/tokens", async (req, res, next) => {
     const sort = (req.query.sort as "volume" | "holders" | "marketcap") ?? "volume";
     const orderBy =
       sort === "holders"
-        ? { holders: "desc" as const }
+        ? { holderCount: "desc" as const }
         : sort === "marketcap"
           ? { marketCapUsd: "desc" as const }
           : { volume24h: "desc" as const };
@@ -293,7 +293,7 @@ apiRouter.get("/leaderboard/tokens", async (req, res, next) => {
         curveShape: true,
         priceUsd: true,
         marketCapUsd: true,
-        holders: true,
+        holderCount: true,
         volume24h: true,
         graduated: true,
         creator: true,
