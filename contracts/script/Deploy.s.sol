@@ -40,7 +40,11 @@ abstract contract DeployScript is Script {
         address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
         address treasury = vm.envAddress("TREASURY_ADDRESS");
         address devWallet = vm.envAddress("DEV_WALLET_ADDRESS");
-        address moonTokenGov = vm.envOr("MOON_TOKEN", address(0)); // governance $MOON (optional)
+        // MoonBurner requires a non-zero moonToken address. Use treasury as
+        // placeholder — can be updated later via MoonBurner admin (currently
+        // MoonBurner has no setter for moonToken, so this is permanent for now).
+        // In production, deploy the $MOON governance token first and pass its address.
+        address moonTokenGov = vm.envOr("MOON_TOKEN", treasury);
 
         vm.startBroadcast(deployer);
 
@@ -67,6 +71,13 @@ abstract contract DeployScript is Script {
                 d.bondingCurveImpl
             )
         );
+
+        // AUDIT-FIX: Grant factory ADMIN_ROLE on all infra contracts so it can
+        // grant CALLER_ROLE / ACCRUER_ROLE / REFERRER_ROLE to newly-created curves.
+        // Cast to payable because these contracts have receive() functions.
+        CreatorFeeVault(payable(d.creatorFeeVault)).grantRole(bytes32(0x00), d.factory);
+        ReferralRegistry(payable(d.referralRegistry)).grantRole(bytes32(0x00), d.factory);
+        FeeRouter(payable(d.feeRouter)).grantRole(bytes32(0x00), d.factory);
 
         vm.stopBroadcast();
 

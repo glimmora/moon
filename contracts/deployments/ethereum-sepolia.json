@@ -1,0 +1,83 @@
+{
+  "chain": "ethereum-sepolia",
+  "chainId": 11155111,
+  "deployer": "0xe764df96eE2636Eb1e0ecb2D6449f776b3BfB129",
+  "deployedAt": "2026-07-15",
+  "rpc": "https://ethereum-sepolia-rpc.publicnode.com",
+  "status": "PARTIAL — 5 of 8 contracts deployed. Remaining 3 need ~0.015 ETH, wallet has 0.004 ETH.",
+  "contracts": {
+    "moonTokenImpl": {
+      "address": "0x4cE45cf3bE80858Bb85355E1052F7C9a7469D033",
+      "codeSize": 5599,
+      "status": "deployed"
+    },
+    "bondingCurveImpl": {
+      "address": "0x0d4f99646e33f40522cbd0C6BAc1ac857c4eD6A8",
+      "codeSize": 8045,
+      "status": "deployed"
+    },
+    "creatorFeeVault": {
+      "address": "0xc76B0b5981882CC3FC13840208DF9eD1B7E7Fd3f",
+      "codeSize": 3597,
+      "status": "deployed"
+    },
+    "referralRegistry": {
+      "address": "0x05ae1ef0605D265fA0f9E20DA68b64159ef53F98",
+      "codeSize": 4137,
+      "status": "deployed"
+    },
+    "moonBurner": {
+      "address": "0xaca899314bd11E103779CA0a790C9b33c2b8FebA",
+      "codeSize": 4672,
+      "status": "deployed",
+      "note": "moonToken set to treasury (placeholder), dexRouter set to address(0)"
+    },
+    "feeRouter": {
+      "address": null,
+      "status": "NOT DEPLOYED — insufficient gas"
+    },
+    "v3Concentrator": {
+      "address": null,
+      "status": "NOT DEPLOYED — insufficient gas"
+    },
+    "factory": {
+      "address": null,
+      "status": "NOT DEPLOYED — insufficient gas"
+    }
+  },
+  "remainingDeployment": {
+    "feeRouter": {
+      "constructorArgs": [
+        "0xe764df96eE2636Eb1e0ecb2D6449f776b3BfB129",
+        "0xaca899314bd11E103779CA0a790C9b33c2b8FebA",
+        "0xe764df96eE2636Eb1e0ecb2D6449f776b3BfB129"
+      ],
+      "estimatedGas": "600000",
+      "command": "forge create src/FeeRouter.sol:FeeRouter --rpc-url $RPC --private-key $PK --gas-price 5000000000 --broadcast --constructor-args 0xe764... 0xaca8... 0xe764..."
+    },
+    "v3Concentrator": {
+      "constructorArgs": ["0xe764df96eE2636Eb1e0ecb2D6449f776b3BfB129"],
+      "estimatedGas": "500000",
+      "command": "forge create src/MoonV3Concentrator.sol:MoonV3Concentrator --rpc-url $RPC --private-key $PK --gas-price 5000000000 --broadcast --constructor-args 0xe764..."
+    },
+    "factory": {
+      "constructorArgs": [
+        "<feeRouter address>",
+        "0xc76B0b5981882CC3FC13840208DF9eD1B7E7Fd3f",
+        "0x05ae1ef0605D265fA0f9E20DA68b64159ef53F98",
+        "<v3Concentrator address>",
+        "0xe764df96eE2636Eb1e0ecb2D6449f776b3BfB129",
+        "0x4cE45cf3bE80858Bb85355E1052F7C9a7469D033",
+        "0x0d4f99646e33f40522cbd0C6BAc1ac857c4eD6A8"
+      ],
+      "estimatedGas": "1200000",
+      "command": "forge create src/MoonFactory.sol:MoonFactory --rpc-url $RPC --private-key $PK --gas-price 5000000000 --broadcast --constructor-args <feeRouter> 0xc76B... 0x05ae... <v3Concentrator> 0xe764... 0x4cE4... 0x0d4f..."
+    },
+    "postDeploy": "Grant factory ADMIN_ROLE on FeeRouter, CreatorFeeVault, ReferralRegistry (3 transactions, ~50k gas each)"
+  },
+  "walletBalance": {
+    "initial": "0.025 ETH",
+    "remaining": "0.004 ETH",
+    "needed": "~0.015 ETH (for FeeRouter + V3Concentrator + Factory + 3 grantRole txs)"
+  }
+}
