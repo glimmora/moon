@@ -56,28 +56,39 @@ export function useCreateToken(chainId: number) {
         }
       }
 
+      // Build the args object — must match CreateParams struct on-chain.
+      const createArgs = {
+        name: form.name,
+        symbol: form.symbol,
+        imageUrl: form.imageUrl || "",
+        description: form.description || "",
+        maxTxBps: BigInt(form.maxTxBps),
+        maxHoldBps: BigInt(form.maxHoldBps),
+        cooldownSeconds: BigInt(form.cooldownSeconds),
+        supplyTier: form.supplyTier,
+        curveShape: form.curveShape,
+      };
+
+      // Use a high gas limit to avoid estimation failures — the factory
+      // createToken() does multiple external calls (clone + init + role grants)
+      // which can confuse gas estimation in some wallets.
       const hash = await writeContractAsync({
         abi: moonFactoryAbi,
         address: contracts.factory,
         functionName: "createToken",
-        args: [
-          {
-            name: form.name,
-            symbol: form.symbol,
-            imageUrl: form.imageUrl,
-            description: form.description,
-            maxTxBps: BigInt(form.maxTxBps),
-            maxHoldBps: BigInt(form.maxHoldBps),
-            cooldownSeconds: BigInt(form.cooldownSeconds),
-            supplyTier: form.supplyTier,
-            curveShape: form.curveShape,
-          },
-        ],
+        args: [createArgs],
         chainId,
+        gas: 5_000_000n, // 5M gas — well above the ~2.5M actual usage
       });
       setLastTxHash(hash);
     } catch (e) {
-      setError(parseContractError(e));
+      const msg = parseContractError(e);
+      // If the error mentions gasLimit or estimation, suggest manual gas.
+      if (msg.includes("gasLimit") || msg.includes("gas") || msg.includes("destructure")) {
+        setError("Gas estimation failed. Please try again — if the error persists, the factory may need ADMIN_ROLE on infra contracts. Run the post-deploy setup in DEPLOYMENT.md.");
+      } else {
+        setError(msg);
+      }
     } finally {
       setPending(false);
     }
