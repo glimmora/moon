@@ -240,8 +240,37 @@ EOF
   local pid=$!
   echo "$pid" > "$PID_DIR/backend.pid"
   info "Backend PID: $pid"
-  info "URL: http://localhost:$BACKEND_PORT"
-  info "Logs: $LOG_DIR/backend.log"
+
+  # Wait for backend to start (or crash), then verify it's actually listening
+  info "Waiting for backend to start…"
+  local waited=0
+  local max_wait=15
+  while [ $waited -lt $max_wait ]; do
+    # Check if process is still alive
+    if ! kill -0 "$pid" 2>/dev/null; then
+      err "Backend process died after startup! Crash log:"
+      echo ""
+      cat "$LOG_DIR/backend.log"
+      echo ""
+      exit 1
+    fi
+    # Check if port is listening
+    if curl -s "http://localhost:$BACKEND_PORT/health" > /dev/null 2>&1; then
+      info "Backend is listening on port $BACKEND_PORT ✓"
+      info "URL: http://localhost:$BACKEND_PORT"
+      info "Logs: $LOG_DIR/backend.log"
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+
+  # Timeout — backend didn't start in time
+  warn "Backend hasn't responded after ${max_wait}s. Last 20 log lines:"
+  echo ""
+  tail -20 "$LOG_DIR/backend.log"
+  echo ""
+  warn "Full log: $LOG_DIR/backend.log"
 }
 
 # ─── Status ────────────────────────────────────────────────────────────

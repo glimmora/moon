@@ -1,17 +1,10 @@
 /**
- * ABIs used by the backend indexer. Kept as plain objects (not viem abis) for
- * serialization safety across the dynamic-import boundary.
+ * ABIs used by the backend indexer.
+ * Copied from frontend/src/abi/ to avoid cross-directory imports
+ * (which crash tsx when the path goes outside backend rootDir).
  */
-import { moonFactoryAbi } from "../../frontend/src/abi/MoonFactory.js";
-import { bondingCurveAbi } from "../../frontend/src/abi/BondingCurve.js";
-import { moonTokenAbi } from "../../frontend/src/abi/MoonToken.js";
-import { creatorFeeVaultAbi } from "../../frontend/src/abi/CreatorFeeVault.js";
-import { referralRegistryAbi } from "../../frontend/src/abi/ReferralRegistry.js";
-
-export {
-  moonFactoryAbi,
-  bondingCurveAbi,
-  moonTokenAbi,
-  creatorFeeVaultAbi,
-  referralRegistryAbi,
-};
+export { moonFactoryAbi } from "./MoonFactory.js";
+export { bondingCurveAbi } from "./BondingCurve.js";
+export { moonTokenAbi } from "./MoonToken.js";
+export { creatorFeeVaultAbi } from "./CreatorFeeVault.js";
+export { referralRegistryAbi } from "./ReferralRegistry.js";
