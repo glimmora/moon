@@ -1,12 +1,17 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Rocket, Search, Star, Plus, Command, Trophy, Wallet, Sun, Moon, Gift, Users, ChevronDown, LogOut } from "lucide-react";
+import {
+  Rocket, Search, Star, Plus, Command, Trophy, Wallet,
+  Sun, Moon, Gift, Users, ChevronDown, LogOut,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount, useDisconnect } from "wagmi";
+import { useAccount, useDisconnect, useChainId } from "wagmi";
 import { useNetworkMode } from "@/stores/networkMode";
 import { useTheme } from "@/stores/theme";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
+import { chainMeta } from "@/config/chains";
 import { useEffect, useState, useRef } from "react";
+import { shortenAddress } from "@/lib/format";
 
 const NAV = [
   { to: "/", label: "Explore", icon: Rocket },
@@ -25,12 +30,6 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => {};
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
@@ -41,10 +40,6 @@ export function Header() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  const handleModeToggle = () => {
-    toggleMode();
-  };
 
   return (
     <>
@@ -125,10 +120,10 @@ export function Header() {
 
           {/* Right cluster */}
           <div className="ml-auto flex items-center gap-2">
-            {/* Backend health dot — green/red only, no text */}
+            {/* Backend health dot */}
             <div
               className={cn(
-                "h-2.5 w-2.5 rounded-full transition-colors",
+                "h-2.5 w-2.5 rounded-full transition-colors shrink-0",
                 isOnline
                   ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"
                   : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse",
@@ -151,7 +146,7 @@ export function Header() {
 
             {/* Network mode toggle */}
             <button
-              onClick={handleModeToggle}
+              onClick={toggleMode}
               className={cn(
                 "btn-ghost text-xs !px-3",
                 mode === "testnet" && "border-amber-500/30 text-amber-600",
@@ -168,16 +163,17 @@ export function Header() {
               {mode === "mainnet" ? "Mainnet" : "Testnet"}
             </button>
 
-            {/* Wallet connect + dropdown with Claim/Referrals */}
-            <WalletWithDropdown />
+            {/* Single wallet button — ConnectButton when disconnected,
+                custom dropdown when connected (no duplication) */}
+            <WalletButton />
           </div>
         </div>
       </header>
 
-      {/* Spacer to offset fixed header height */}
+      {/* Spacer to offset fixed header */}
       <div className="h-14" />
 
-      {/* Command-style search modal */}
+      {/* Search modal */}
       {searchOpen && (
         <div
           className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] px-4 animate-fade-in"
@@ -229,10 +225,17 @@ export function Header() {
   );
 }
 
-/** Wallet connect button + dropdown menu (Claim, Referrals) when connected. */
-function WalletWithDropdown() {
+/**
+ * Single wallet button.
+ * - When NOT connected: shows RainbowKit ConnectButton (opens modal).
+ * - When connected: shows ONE custom button with wallet avatar + address + chevron,
+ *   clicking opens dropdown with Claim Fees / Referrals / Disconnect.
+ *   No duplication — the RainbowKit ConnectButton is NOT rendered when connected.
+ */
+function WalletButton() {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
+  const chainId = useChainId();
   const { pathname } = useLocation();
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
@@ -248,38 +251,65 @@ function WalletWithDropdown() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  if (!isConnected) {
+  // Not connected → show RainbowKit ConnectButton only
+  if (!isConnected || !address) {
     return <ConnectButton showBalance={false} chainStatus="icon" />;
   }
 
+  const meta = chainMeta[chainId];
   const menuItems = [
     { to: "/claim", label: "Claim Fees", icon: Gift },
     { to: "/referral", label: "Referrals", icon: Users },
   ];
 
   return (
-    <div className="relative flex items-center gap-2" ref={ref}>
-      <ConnectButton showBalance={false} chainStatus="icon" accountStatus="avatar" />
-
-      {/* Dropdown trigger */}
+    <div className="relative" ref={ref}>
+      {/* Single button: avatar + address + chevron */}
       <button
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "flex items-center justify-center rounded-lg p-2 transition-colors",
+          "flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-sm transition-all",
           theme === "light"
-            ? "hover:bg-neutral-100 text-neutral-600"
-            : "hover:bg-white/[0.06] text-neutral-400",
+            ? "border-neutral-200 bg-white hover:bg-neutral-50"
+            : "border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]",
         )}
-        aria-label="Account menu"
       >
-        <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
+        {/* Wallet avatar — gradient circle with first 2 chars of address */}
+        <div className="relative shrink-0">
+          <div className="absolute inset-0 rounded-full bg-moon-gradient opacity-40 blur-[3px]" />
+          <div className="relative h-7 w-7 rounded-full bg-moon-gradient flex items-center justify-center text-[10px] font-bold text-white">
+            {address.slice(2, 4).toUpperCase()}
+          </div>
+        </div>
+
+        {/* Address (hidden on mobile) */}
+        <span className={cn(
+          "hidden sm:inline font-mono text-xs",
+          theme === "light" ? "text-neutral-700" : "text-neutral-300",
+        )}>
+          {shortenAddress(address, 4)}
+        </span>
+
+        {/* Chain indicator dot */}
+        {meta && (
+          <span
+            className="h-2 w-2 rounded-full shrink-0 bg-moon-400"
+            title={meta.label}
+          />
+        )}
+
+        <ChevronDown className={cn(
+          "h-3.5 w-3.5 transition-transform shrink-0",
+          theme === "light" ? "text-neutral-400" : "text-neutral-500",
+          open && "rotate-180",
+        )} />
       </button>
 
       {/* Dropdown menu */}
       {open && (
         <div
           className={cn(
-            "absolute top-full right-0 mt-2 w-52 rounded-xl border shadow-xl overflow-hidden animate-scale-in z-[60]",
+            "absolute top-full right-0 mt-2 w-56 rounded-xl border shadow-xl overflow-hidden animate-scale-in z-[60]",
             theme === "light"
               ? "bg-white border-neutral-200"
               : "bg-ink-900 border-white/[0.08]",
@@ -290,10 +320,22 @@ function WalletWithDropdown() {
             "px-4 py-3 border-b",
             theme === "light" ? "border-neutral-100" : "border-white/[0.04]",
           )}>
-            <p className="text-[10px] uppercase tracking-wider text-neutral-500">Connected</p>
-            <p className="text-xs font-mono mt-0.5">
-              {address?.slice(0, 8)}…{address?.slice(-6)}
-            </p>
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-moon-gradient flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+                {address.slice(2, 4).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wider text-neutral-500">Connected</p>
+                <p className="text-xs font-mono truncate">
+                  {shortenAddress(address, 5)}
+                </p>
+              </div>
+            </div>
+            {meta && (
+              <p className="mt-1.5 text-[10px] text-neutral-500">
+                {meta.label}
+              </p>
+            )}
           </div>
 
           {/* Menu items */}
