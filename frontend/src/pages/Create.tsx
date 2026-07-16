@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useChainId } from "wagmi";
 import { useCreateToken, type CreateTokenForm } from "@/hooks/useCreateToken";
 import { useNetworkMode } from "@/stores/networkMode";
-import { chainMeta, MAINNET_CHAIN_IDS, TESTNET_CHAIN_IDS } from "@/config/chains";
-import { Rocket, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, SlidersHorizontal } from "lucide-react";
+import { chainMeta } from "@/config/chains";
+import { Rocket, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, SlidersHorizontal, Globe } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Link } from "react-router-dom";
 
@@ -29,20 +29,23 @@ const CURVE_DESC = [
 
 export function Create() {
   const { address } = useAccount();
-  const { mode } = useNetworkMode();
+  const { mode, defaultChainId } = useNetworkMode();
+  const walletChainId = useChainId();
+  // Use the wallet's active chain if connected; otherwise fall back to the
+  // network mode default (first active chain for mainnet/testnet).
+  const chainId = walletChainId ?? defaultChainId;
   const [form, setForm] = useState<CreateTokenForm>(DEFAULTS);
-  const [chainId, setChainId] = useState<number>(mode === "mainnet" ? MAINNET_CHAIN_IDS[0] : TESTNET_CHAIN_IDS[0]);
   const { create, pending, error, confirmed } = useCreateToken(chainId);
 
   const set = <K extends keyof CreateTokenForm>(key: K, value: CreateTokenForm[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  const chainIds = mode === "mainnet" ? MAINNET_CHAIN_IDS : TESTNET_CHAIN_IDS;
-
   function submit(e: React.FormEvent) {
     e.preventDefault();
     create(form);
   }
+
+  const activeChain = chainMeta[chainId];
 
   return (
     <div className="py-6 animate-fade-in-up">
@@ -147,12 +150,37 @@ export function Create() {
               </div>
             </Field>
 
-            <Field label="Chain">
-              <select className="input" value={chainId} onChange={(e) => setChainId(Number(e.target.value))}>
-                {chainIds.map((id) => (
-                  <option key={id} value={id}>{chainMeta[id]?.label ?? `Chain ${id}`}</option>
-                ))}
-              </select>
+            {/* Active chain — read-only, derived from wallet / network mode.
+                No manual selector; user changes chain via the top-bar toggle
+                or directly in their wallet. */}
+            <Field label="Network">
+              <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                <Globe className={cn("h-4 w-4", mode === "testnet" ? "text-amber-400" : "text-emerald-400")} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">
+                    {activeChain?.label ?? `Chain #${chainId}`}
+                  </p>
+                  <p className="text-[11px] text-neutral-500">
+                    {address
+                      ? walletChainId
+                        ? "Following your wallet's selected network"
+                        : `Default for ${mode} mode`
+                      : `Default for ${mode} mode — connect wallet to follow wallet`}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "chip text-[10px]",
+                    mode === "testnet" ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300",
+                  )}
+                >
+                  {mode}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11px] text-neutral-500">
+                Switch network via the top-bar toggle or your wallet. The transaction will
+                auto-prompt a chain switch if your wallet is on a different network.
+              </p>
             </Field>
 
             <div className="divider" />
