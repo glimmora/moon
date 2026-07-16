@@ -1,12 +1,16 @@
 // moon.fun backend Prisma schema.
-// Database: PostgreSQL 16
+// Database: PostgreSQL 16 (production) or SQLite (local dev fallback).
+//
+// The provider is read from the DATABASE_PROVIDER env var (default: postgresql).
+// `./scripts/dev.sh` sets DATABASE_PROVIDER=sqlite when falling back to a
+// local file database; production sets DATABASE_PROVIDER=postgresql.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = env("DATABASE_PROVIDER")
   url      = env("DATABASE_URL")
 }
 
@@ -105,7 +109,7 @@ model IndexerCheckpoint {
   id           String @id
   chainId      Int
   eventName    String
-  lastBlock    BigInt @default(0n)
+  lastBlock    BigInt @default(0)
   updatedAt    DateTime @updatedAt
 
   @@unique([chainId, eventName])

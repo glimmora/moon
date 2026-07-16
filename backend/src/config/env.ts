@@ -8,7 +8,11 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
 
-  DATABASE_URL: z.string().url(),
+  // DATABASE_URL can be either a postgres URL (postgresql://…) or a sqlite
+  // file path (file:./dev.db). Don't use z.string().url() — it rejects the
+  // sqlite form.
+  DATABASE_URL: z.string().min(1),
+  DATABASE_PROVIDER: z.enum(["postgresql", "sqlite"]).default("postgresql"),
   REDIS_URL: z.string().url().optional(),
 
   JWT_SECRET: z.string().min(8).default("dev-secret"),

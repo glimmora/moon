@@ -96,13 +96,39 @@ start_backend() {
     npm install > "$LOG_DIR/backend-install.log" 2>&1
   fi
 
-  # Ensure .env exists — fallback to sqlite if no DATABASE_URL configured
+  # Ensure .env exists — detect Postgres or fall back to sqlite
   if [ ! -f ".env" ]; then
-    warn "backend/.env not found — creating minimal sqlite config"
-    cat > .env <<'EOF'
+    # Check if Postgres is reachable on localhost:5432
+    if command -v pg_isready >/dev/null 2>&1 && pg_isready -h localhost -p 5432 -q 2>/dev/null; then
+      info "Postgres detected on localhost:5432 — using postgresql provider"
+      cat > .env <<'EOF'
 BACKEND_PORT=4000
 NODE_ENV=development
 CORS_ORIGIN=http://localhost:5173
+DATABASE_PROVIDER=postgresql
+DATABASE_URL=postgresql://moon:moon@localhost:5432/moonfun
+JWT_SECRET=dev-secret-change-me
+BSC_RPC_URL=https://bsc-dataseed.binance.org
+BASE_RPC_URL=https://mainnet.base.org
+ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
+BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
+BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
+ARBITRUM_SEPOLIA_RPC_URL=https://sepolia-arbitrum.api.onrender.com
+ETHEREUM_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+POLL_INTERVAL_MS=4000
+START_BLOCK_OFFSET=10000
+MAX_BLOCK_BATCH=500
+FACTORY_ETHEREUM_SEPOLIA=0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3
+TREASURY_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
+DEV_WALLET_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
+EOF
+    else
+      warn "Postgres not detected — using sqlite fallback (file:./dev.db)"
+      cat > .env <<'EOF'
+BACKEND_PORT=4000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:5173
+DATABASE_PROVIDER=sqlite
 DATABASE_URL=file:./dev.db
 JWT_SECRET=dev-secret-change-me
 BSC_RPC_URL=https://bsc-dataseed.binance.org
@@ -119,6 +145,15 @@ FACTORY_ETHEREUM_SEPOLIA=0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3
 TREASURY_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
 DEV_WALLET_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
 EOF
+    fi
+  fi
+
+  # Show which DB provider is configured
+  if [ -f ".env" ]; then
+    local provider=$(grep -E "^DATABASE_PROVIDER=" .env | cut -d= -f2 || echo "postgresql")
+    local dburl=$(grep -E "^DATABASE_URL=" .env | cut -d= -f2- || echo "?")
+    info "Database provider: $provider"
+    info "Database URL: $dburl"
   fi
 
   # Generate Prisma client + push schema (sqlite-compatible)
