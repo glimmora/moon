@@ -2,14 +2,22 @@ import { type ChainConfig } from "../config/chains.js";
 import { logger } from "../utils/logger.js";
 import { tokenService } from "../services/tokenService.js";
 import { tradeService } from "../services/tradeService.js";
+import { referralService } from "../services/referralService.js";
 import { prisma } from "../utils/db.js";
 import { env } from "../config/env.js";
-import { moonFactoryAbi, bondingCurveAbi } from "../config/abi.js";
-import { createPublicClient, http, parseEventLogs, type Log, getAddress } from "viem";
+import { moonFactoryAbi, bondingCurveAbi, referralRegistryAbi, creatorFeeVaultAbi } from "../config/abi.js";
+import { createPublicClient, http, parseEventLogs, type Log, getAddress, type AbiEvent } from "viem";
+import type { MoonIO } from "../sockets/server.js";
 
 interface IndexerState {
   lastBlock: bigint;
   running: boolean;
+  interval?: ReturnType<typeof setInterval>;
+  polling: boolean;
+  backoffUntil: number;
+  consecutiveErrors: number;
+  referralRegistry?: `0x${string}`;
+  creatorFeeVault?: `0x${string}`;
 }
 
 const states = new Map<number, IndexerState>();
@@ -21,7 +29,7 @@ const states = new Map<number, IndexerState>();
  * Idempotent: persists the last processed block per (chainId, eventName) and
  * resumes from there on restart.
  */
-export async function startChainListener(chain: ChainConfig): Promise<void> {
+export async function startChainListener(chain: ChainConfig, io?: MoonIO): Promise<void> {
   if (!chain.factoryAddress) {
     logger.warn({ chainId: chain.chainId }, "No factory address — skipping chain listener");
     return;
@@ -36,38 +44,93 @@ export async function startChainListener(chain: ChainConfig): Promise<void> {
   const checkpoint = await prisma.indexerCheckpoint.findUnique({
     where: { id: `factory-${chain.chainId}` },
   });
-  let lastBlock = checkpoint?.lastBlock
+  const lastBlock = checkpoint?.lastBlock
     ? BigInt(checkpoint.lastBlock)
     : await getRecentBlock(client);
 
-  states.set(chain.chainId, { lastBlock, running: true });
-  logger.info({ chainId: chain.chainId, lastBlock: lastBlock.toString() }, "Chain listener started");
+  // Resolve the referral registry + creator fee vault addresses from the factory so
+  // we can index ReferralRecorded / FeesAccrued without extra per-chain env vars.
+  let referralRegistry: `0x${string}` | undefined;
+  let creatorFeeVault: `0x${string}` | undefined;
+  try {
+    const [reg, vault] = await Promise.all([
+      client.readContract({ address: chain.factoryAddress as `0x${string}`, abi: moonFactoryAbi, functionName: "referralRegistry" }) as Promise<`0x${string}`>,
+      client.readContract({ address: chain.factoryAddress as `0x${string}`, abi: moonFactoryAbi, functionName: "creatorFeeVault" }) as Promise<`0x${string}`>,
+    ]);
+    const zero = "0x0000000000000000000000000000000000000000";
+    if (reg && reg !== zero) referralRegistry = getAddress(reg);
+    if (vault && vault !== zero) creatorFeeVault = getAddress(vault);
+  } catch (err) {
+    logger.warn({ chainId: chain.chainId, err }, "Could not resolve referral/fee addresses — those events won't be indexed");
+  }
 
-  // Poll loop.
-  setInterval(async () => {
+  states.set(chain.chainId, { lastBlock, running: true, polling: false, backoffUntil: 0, consecutiveErrors: 0, referralRegistry, creatorFeeVault });
+  logger.info({ chainId: chain.chainId, lastBlock: lastBlock.toString(), referralRegistry, creatorFeeVault }, "Chain listener started");
+
+  // Poll loop with concurrency guard.
+  const interval = setInterval(async () => {
     const state = states.get(chain.chainId);
-    if (!state?.running) return;
+    if (!state?.running || state.polling) return;
+    // RPC error backoff — skip this tick until the cooldown elapses.
+    if (Date.now() < state.backoffUntil) return;
+    state.polling = true;
     try {
-      const current = await client.getBlockNumber();
-      const toBlock = current > state.lastBlock + BigInt(env.MAX_BLOCK_BATCH)
-        ? state.lastBlock + BigInt(env.MAX_BLOCK_BATCH)
-        : current;
+      const head = await client.getBlockNumber();
+      // Confirmation lag: never index newer than (head - CONFIRMATIONS) so that
+      // shallow reorgs never surface indexed data we'd have to undo.
+      const confirmations = BigInt(env.CONFIRMATIONS);
+      const safeHead = head > confirmations ? head - confirmations : 0n;
+      if (safeHead === 0n || safeHead <= state.lastBlock - BigInt(env.REORG_REWIND_BLOCKS)) {
+        // Nothing new past the safe head — but still allow rewind scan below only
+        // if we have new safe blocks. If not, bail early.
+        if (safeHead <= state.lastBlock) return;
+      }
 
-      if (toBlock <= state.lastBlock) return;
+      // Reorg heal: re-scan the last REORG_REWIND_BLOCKS confirmed blocks. Upserts
+      // are keyed by (chainId, txHash, tokenAddress) so re-processing is idempotent,
+      // and a canonical reorg replacement will overwrite stale rows.
+      const rewind = BigInt(env.REORG_REWIND_BLOCKS);
+      const fromBlock = state.lastBlock + 1n > rewind ? state.lastBlock + 1n - rewind : 1n;
+      const toBlock = safeHead > fromBlock + BigInt(env.MAX_BLOCK_BATCH)
+        ? fromBlock + BigInt(env.MAX_BLOCK_BATCH)
+        : safeHead;
 
-      await pollFactoryEvents(client, chain, state.lastBlock + 1n, toBlock);
-      await pollCurveEvents(client, chain, state.lastBlock + 1n, toBlock);
+      if (toBlock < fromBlock) return;
 
-      state.lastBlock = toBlock;
+      await pollFactoryEvents(client, chain, fromBlock, toBlock);
+      await pollCurveEvents(client, chain, fromBlock, toBlock, io);
+      // Referral/fee accumulators are additive (not idempotent upserts), so they
+      // must only see blocks strictly newer than the last committed checkpoint —
+      // never the reorg-rewind window (which would double-count).
+      const feeFrom = state.lastBlock + 1n;
+      if (toBlock >= feeFrom) {
+        await pollReferralAndFeeEvents(client, chain, feeFrom, toBlock, state);
+      }
+
+      // Save checkpoint to DB FIRST, then update in-memory state.
+      // This prevents blocks from being permanently skipped if crash occurs between them.
+      const newLast = toBlock > state.lastBlock ? toBlock : state.lastBlock;
       await prisma.indexerCheckpoint.upsert({
         where: { id: `factory-${chain.chainId}` },
-        create: { id: `factory-${chain.chainId}`, chainId: chain.chainId, eventName: "factory", lastBlock: toBlock },
-        update: { lastBlock: toBlock },
+        create: { id: `factory-${chain.chainId}`, chainId: chain.chainId, eventName: "factory", lastBlock: newLast },
+        update: { lastBlock: newLast },
       });
+      state.lastBlock = newLast;
+      state.consecutiveErrors = 0;
     } catch (err) {
-      logger.error({ chainId: chain.chainId, err }, "Chain listener poll error");
+      // Exponential backoff (capped at 60s) to avoid hammering a failing RPC.
+      state.consecutiveErrors += 1;
+      const delay = Math.min(60_000, env.POLL_INTERVAL_MS * 2 ** Math.min(state.consecutiveErrors, 5));
+      state.backoffUntil = Date.now() + delay;
+      logger.error({ chainId: chain.chainId, err, backoffMs: delay }, "Chain listener poll error — backing off");
+    } finally {
+      state.polling = false;
     }
   }, env.POLL_INTERVAL_MS);
+
+  // Store ref for cleanup on shutdown.
+  const s = states.get(chain.chainId);
+  if (s) s.interval = interval;
 }
 
 async function getRecentBlock(client: ReturnType<typeof createPublicClient>): Promise<bigint> {
@@ -88,7 +151,7 @@ async function pollFactoryEvents(
     toBlock,
   })) as Log[];
 
-  const parsed = parseEventLogs({ abi: moonFactoryAbi, logs: logs as never });
+  const parsed = parseEventLogs({ abi: moonFactoryAbi, logs: logs as Log[] });
   for (const log of parsed) {
     if (log.eventName !== "TokenCreated") continue;
     const args = log.args as unknown as {
@@ -125,15 +188,42 @@ async function pollCurveEvents(
   chain: ChainConfig,
   fromBlock: bigint,
   toBlock: bigint,
+  io?: MoonIO,
 ): Promise<void> {
-  const events = bondingCurveAbi.filter((a) => a.type === "event" && ["Bought", "Sold", "Graduated"].includes(a.name));
+  const eventDefs = bondingCurveAbi.filter((a) => a.type === "event" && ["Bought", "Sold", "Graduated"].includes(a.name)) as AbiEvent[];
   const logs = (await client.getLogs({
-    event: events[0],
+    events: eventDefs,
     fromBlock,
     toBlock,
   })) as Log[];
 
-  const parsed = parseEventLogs({ abi: bondingCurveAbi, logs: logs as never });
+  const parsed = parseEventLogs({ abi: bondingCurveAbi, logs: logs as Log[] });
+
+  // Fetch block timestamps in batch for accurate trade times.
+  const blockNumbers = [...new Set(parsed.map((l) => l.blockNumber).filter(Boolean))] as bigint[];
+  const blockTimestamps = new Map<bigint, Date>();
+  await Promise.all(
+    blockNumbers.map(async (bn) => {
+      try {
+        const block = await client.getBlock({ blockNumber: bn });
+        blockTimestamps.set(bn, new Date(Number(block.timestamp) * 1000));
+      } catch { /* skip — fall back to new Date() */ }
+    }),
+  );
+
+  // Batch-resolve all curve addresses to token records to avoid N+1.
+  const curveAddresses = [...new Set(parsed.map((l) => l.address.toLowerCase()))];
+  const tokensByCurve = new Map<string, { address: string }>();
+  if (curveAddresses.length > 0) {
+    const found = await prisma.token.findMany({
+      where: { chainId: chain.chainId, curve: { in: curveAddresses.map((a) => getAddress(a)) } },
+      select: { address: true, curve: true },
+    });
+    for (const t of found) {
+      if (t.curve) tokensByCurve.set(t.curve.toLowerCase(), t);
+    }
+  }
+
   for (const log of parsed) {
     if (log.eventName === "Bought" || log.eventName === "Sold") {
       const args = log.args as unknown as {
@@ -146,19 +236,44 @@ async function pollCurveEvents(
         fee?: bigint;
         priceAfter?: bigint;
       };
+      const curveKey = (log.address as string).toLowerCase();
+      const token = tokensByCurve.get(curveKey);
+      if (!token) {
+        logger.warn({ chainId: chain.chainId, curve: log.address }, "Curve event for unknown token — skipping");
+        continue;
+      }
       await tradeService.record({
         chainId: chain.chainId,
         txHash: log.transactionHash ?? "0x0",
-        tokenAddress: log.address,
+        tokenAddress: token.address,
         side: log.eventName === "Bought" ? "buy" : "sell",
-        trader: getAddress(args.buyer ?? args.seller ?? "0x0"),
+        trader: (() => {
+          const raw = args.buyer ?? args.seller;
+          if (!raw || raw === "0x0") return "0x0000000000000000000000000000000000000000";
+          return getAddress(raw);
+        })(),
         quoteAmount: (args.quoteIn ?? args.quoteOut ?? 0n).toString(),
         tokenAmount: (args.tokensOut ?? args.tokensIn ?? 0n).toString(),
         priceUsd: Number(args.priceAfter ?? 0n) / 1e18,
         feeUsd: Number(args.fee ?? 0n) / 1e18,
         blockNumber: log.blockNumber,
-        timestamp: new Date(),
+        timestamp: blockTimestamps.get(log.blockNumber ?? 0n) ?? new Date(),
       });
+
+      // BE-H1: Broadcast trade to connected clients.
+      if (io) {
+        const room = `token:${chain.chainId}:${token.address.toLowerCase()}`;
+        io.to(room).emit("trade", {
+          chainId: chain.chainId,
+          tokenAddress: token.address,
+          side: log.eventName === "Bought" ? "buy" : "sell",
+          trader: args.buyer ?? args.seller,
+          quoteAmount: (args.quoteIn ?? args.quoteOut ?? 0n).toString(),
+          tokenAmount: (args.tokensOut ?? args.tokensIn ?? 0n).toString(),
+          priceUsd: Number(args.priceAfter ?? 0n) / 1e18,
+          timestamp: (blockTimestamps.get(log.blockNumber ?? 0n) ?? new Date()).getTime(),
+        });
+      }
     } else if (log.eventName === "Graduated") {
       const args = log.args as unknown as { token: string; pair: string };
       await tokenService.markGraduated(chain.chainId, getAddress(args.token), getAddress(args.pair));
@@ -167,7 +282,76 @@ async function pollCurveEvents(
   }
 }
 
+async function pollReferralAndFeeEvents(
+  client: ReturnType<typeof createPublicClient>,
+  chain: ChainConfig,
+  fromBlock: bigint,
+  toBlock: bigint,
+  state: IndexerState,
+): Promise<void> {
+  // Referral rewards — accumulate per referrer.
+  if (state.referralRegistry) {
+    const events = referralRegistryAbi.filter(
+      (a) => a.type === "event" && a.name === "ReferralRecorded",
+    ) as AbiEvent[];
+    const logs = (await client.getLogs({
+      address: state.referralRegistry,
+      events,
+      fromBlock,
+      toBlock,
+    })) as Log[];
+    const parsed = parseEventLogs({ abi: referralRegistryAbi, logs: logs as Log[] });
+    for (const log of parsed) {
+      if (log.eventName !== "ReferralRecorded") continue;
+      const args = log.args as unknown as {
+        referrer: string;
+        tradeVolume: bigint;
+        rewardAmount: bigint;
+      };
+      if (!args.referrer || args.referrer === "0x0000000000000000000000000000000000000000") continue;
+      await referralService.record(
+        chain.chainId,
+        getAddress(args.referrer),
+        args.tradeVolume ?? 0n,
+        args.rewardAmount ?? 0n,
+      );
+    }
+  }
+
+  // Creator fees — accumulate per (creator, quoteAsset).
+  if (state.creatorFeeVault) {
+    const events = creatorFeeVaultAbi.filter(
+      (a) => a.type === "event" && a.name === "FeesAccrued",
+    ) as AbiEvent[];
+    const logs = (await client.getLogs({
+      address: state.creatorFeeVault,
+      events,
+      fromBlock,
+      toBlock,
+    })) as Log[];
+    const parsed = parseEventLogs({ abi: creatorFeeVaultAbi, logs: logs as Log[] });
+    for (const log of parsed) {
+      if (log.eventName !== "FeesAccrued") continue;
+      const args = log.args as unknown as {
+        creator: string;
+        quoteAsset: string;
+        amount: bigint;
+      };
+      if (!args.creator) continue;
+      await referralService.recordCreatorFee(
+        chain.chainId,
+        getAddress(args.creator),
+        getAddress(args.quoteAsset),
+        args.amount ?? 0n,
+      );
+    }
+  }
+}
+
 export function stopChainListener(chainId: number): void {
   const state = states.get(chainId);
-  if (state) state.running = false;
+  if (!state) return;
+  state.running = false;
+  if (state.interval) clearInterval(state.interval);
+  states.delete(chainId);
 }

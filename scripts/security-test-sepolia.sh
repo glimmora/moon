@@ -6,8 +6,10 @@ set -uo pipefail
 
 export PATH="$HOME/.foundry/bin:$PATH"
 RPC="https://ethereum-sepolia-rpc.publicnode.com"
-PK="0xbf0153642dffa8adae66b23aadcac2fd18fbc4e1dda0b7f6e4279a7da84db72a"
-PK2="0x77a659b3bb15d475fc2a5caf322afc3a4c6d583e70d1b1bbc5a8663a22e5de11"
+if [ -z "${PRIV_KEY:-}" ]; then echo "FATAL: PRIV_KEY env var required"; exit 1; fi
+if [ -z "${PRIV_KEY2:-}" ]; then echo "FATAL: PRIV_KEY2 env var required"; exit 1; fi
+PK="$PRIV_KEY"
+PK2="$PRIV_KEY2"
 DEPLOYER="0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24"
 ATTACKER="0xe764df96eE2636Eb1e0ecb2D6449f776b3BfB129"
 GAS="2000000000"

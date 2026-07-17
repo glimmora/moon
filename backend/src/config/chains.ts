@@ -84,6 +84,8 @@ export const chainConfigs: ChainConfig[] = [
   },
 ];
 
+export const SUPPORTED_CHAIN_IDS = new Set(chainConfigs.map((c) => c.chainId));
+
 export function chainById(chainId: number): ChainConfig | undefined {
   return chainConfigs.find((c) => c.chainId === chainId);
 }

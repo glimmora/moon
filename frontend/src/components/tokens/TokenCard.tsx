@@ -1,10 +1,14 @@
 import { Link } from "react-router-dom";
-import { Star, Flame, TrendingUp, TrendingDown, ArrowUpRight } from "lucide-react";
+import { Star, Flame, ArrowUpRight } from "lucide-react";
 import { type TokenListItem } from "@/hooks/useTokens";
-import { formatMarketCap, formatPercent, shortenAddress, timeAgo } from "@/lib/format";
+import { formatMarketCap, shortenAddress, timeAgo, graduationProgress } from "@/lib/format";
 import { chainMeta } from "@/config/chains";
 import { cn } from "@/lib/cn";
-import { useState } from "react";
+import { useState, memo } from "react";
+import { useAccount } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
+import { toggleWatchlist } from "@/hooks/useTokens";
+import { useToast } from "@/stores/toast";
 import { LaunchCountdown } from "./LaunchCountdown";
 
 interface TokenCardProps {
@@ -12,25 +16,49 @@ interface TokenCardProps {
   defaultWatched?: boolean;
 }
 
-export function TokenCard({ token, defaultWatched = false }: TokenCardProps) {
+export const TokenCard = memo(function TokenCard({ token, defaultWatched = false }: TokenCardProps) {
+  const { address } = useAccount();
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const [watched, setWatched] = useState(defaultWatched);
+  const watchId = `${token.chainId}-${token.address}`;
   const meta = chainMeta[token.chainId];
-  const change = token.volume24h > 0 ? (token.priceUsd > 0 ? 12.4 : 0) : 0;
-  const positive = change >= 0;
 
-  // Graduation progress (mock — based on volume vs ~793.1M token threshold).
-  // In production this would come from on-chain reserves.
-  const progress = Math.min(100, Math.max(2, (token.volume24h / 50) * 100));
+  // Graduation progress based on volume vs tier-specific threshold.
+  const progress = graduationProgress(token.volume24h, token.supplyTier);
+
+  function handleToggleWatch(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    // Result-aware: reflect what actually got persisted, and surface failures
+    // (e.g. Safari private mode blocking localStorage) instead of silently lying.
+    try {
+      const next = toggleWatchlist(watchId, address);
+      const nowWatched = next.includes(watchId);
+      setWatched(nowWatched);
+      queryClient.invalidateQueries({ queryKey: ["watchlist", address] });
+      toast.success(nowWatched ? `Added ${token.symbol} to watchlist` : `Removed ${token.symbol} from watchlist`);
+    } catch {
+      toast.error("Couldn't update your watchlist", {
+        description: "Your browser may be blocking local storage.",
+      });
+    }
+  }
 
   return (
-    <Link
-      to={`/token/${token.chainId}/${token.address}`}
-      className="card-hover group relative block p-4 overflow-hidden"
-    >
+    <div className="card-hover group relative p-4 overflow-hidden">
+      {/* Stretched navigation link — covers the whole card without wrapping the
+          interactive star button (avoids nested interactive elements). */}
+      <Link
+        to={`/token/${token.chainId}/${token.address}`}
+        className="absolute inset-0 z-0"
+        aria-label={`${token.name} (${token.symbol}) details`}
+      />
+
       {/* Hover sheen */}
       <div className="absolute inset-0 bg-gradient-to-br from-moon-500/[0.04] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-      <div className="relative flex items-start gap-3">
+      <div className="relative z-10 pointer-events-none flex items-start gap-3">
         {/* Avatar with ring */}
         <div className="relative shrink-0">
           <div className="absolute inset-0 rounded-full bg-moon-gradient opacity-30 blur-md group-hover:opacity-50 transition-opacity" />
@@ -72,12 +100,10 @@ export function TokenCard({ token, defaultWatched = false }: TokenCardProps) {
         <div className="flex flex-col items-end gap-1">
           <button
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              setWatched((w) => !w);
-            }}
-            className="rounded-lg p-1.5 text-neutral-500 hover:bg-white/[0.06] hover:text-amber-400 transition-colors"
-            aria-label={watched ? "Remove from watchlist" : "Add to watchlist"}
+            onClick={handleToggleWatch}
+            aria-pressed={watched}
+            className="pointer-events-auto rounded-lg p-1.5 text-neutral-500 hover:bg-white/[0.06] hover:text-amber-400 transition-colors"
+            aria-label={watched ? `Remove ${token.symbol} from watchlist` : `Add ${token.symbol} to watchlist`}
           >
             <Star className={cn("h-4 w-4 transition-all", watched && "fill-amber-400 text-amber-400 scale-110")} />
           </button>
@@ -86,7 +112,7 @@ export function TokenCard({ token, defaultWatched = false }: TokenCardProps) {
       </div>
 
       {/* Stats row */}
-      <div className="relative mt-3 grid grid-cols-3 gap-2 text-xs">
+      <div className="relative z-10 pointer-events-none mt-3 grid grid-cols-3 gap-2 text-xs">
         <div>
           <p className="text-neutral-500 text-[10px] uppercase tracking-wider">Mkt Cap</p>
           <p className="font-semibold text-neutral-100 tabular">{formatMarketCap(token.marketCapUsd)}</p>
@@ -96,35 +122,28 @@ export function TokenCard({ token, defaultWatched = false }: TokenCardProps) {
           <p className="font-semibold text-neutral-100 tabular">${token.priceUsd.toFixed(6)}</p>
         </div>
         <div>
-          <p className="text-neutral-500 text-[10px] uppercase tracking-wider">24h</p>
-          <p
-            className={cn(
-              "flex items-center gap-0.5 font-semibold tabular",
-              positive ? "text-emerald-400" : "text-red-400",
-            )}
-          >
-            {positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-            {formatPercent(change)}
-          </p>
+          <p className="text-neutral-500 text-[10px] uppercase tracking-wider">24h Vol</p>
+          <p className="font-semibold text-neutral-100 tabular">{formatMarketCap(token.volume24h)}</p>
         </div>
       </div>
 
       {/* Graduation progress / countdown */}
-      <div className="relative mt-3">
+      <div className="relative z-10 pointer-events-none mt-3">
         <LaunchCountdown
           progress={progress}
           graduated={token.graduated}
           createdAt={token.createdAt}
           volume24h={token.volume24h}
+          supplyTier={token.supplyTier}
           compact
         />
       </div>
 
       {/* Footer */}
-      <div className="relative mt-3 flex items-center justify-between text-[11px] text-neutral-500">
-        <span className="tabular">{token.holders.toLocaleString()} holders</span>
-        <span className="tabular">Vol ${token.volume24h.toLocaleString()}</span>
+      <div className="relative z-10 pointer-events-none mt-3 flex items-center justify-between text-[11px] text-neutral-500">
+        <span className="tabular">{token.holderCount.toLocaleString()} holders</span>
+        <span className="tabular">{timeAgo(token.createdAt)}</span>
       </div>
-    </Link>
+    </div>
   );
-}
+});

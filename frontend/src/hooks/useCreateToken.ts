@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useChainId } from "wagmi";
+import { useCallback } from "react";
 import { moonFactoryAbi } from "@/abi/MoonFactory";
 import { getContracts } from "@/config/contracts";
-import { parseContractError } from "@/lib/error";
+import { useTxLifecycle } from "@/hooks/useTxLifecycle";
 
 export interface CreateTokenForm {
   name: string;
@@ -16,46 +15,38 @@ export interface CreateTokenForm {
   curveShape: 0 | 1 | 2; // LINEAR / EXPONENTIAL / LOGARITHMIC
 }
 
+const ZERO = "0x0000000000000000000000000000000000000000";
+
+/** Client-side validation mirroring the contract's constraints. Returns null when valid. */
+export function validateCreateForm(form: CreateTokenForm): string | null {
+  if (!form.name.trim()) return "Token name is required.";
+  if (form.name.length > 32) return "Token name must be 32 characters or fewer.";
+  if (!form.symbol.trim()) return "Symbol is required.";
+  if (form.symbol.length > 11) return "Symbol must be 11 characters or fewer.";
+  if (form.maxTxBps < 0 || form.maxTxBps > 500) return "Max Tx must be between 0% and 5%.";
+  if (form.maxHoldBps < 0 || form.maxHoldBps > 1000) return "Max Hold must be between 0% and 10%.";
+  if (form.cooldownSeconds < 0 || form.cooldownSeconds > 3600) return "Cooldown must be between 0 and 3600 seconds.";
+  return null;
+}
+
+/**
+ * Launch a new token via the factory, powered by the shared transaction lifecycle
+ * with a gas-limit fallback for wallets that cannot auto-estimate createToken.
+ */
 export function useCreateToken(chainId: number) {
-  const { address } = useAccount();
-  const activeChainId = useChainId();
-  const { switchChainAsync } = useSwitchChain();
   const contracts = getContracts(chainId);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [lastTxHash, setLastTxHash] = useState<`0x${string}` | null>(null);
-
-  const { writeContractAsync } = useWriteContract();
-
-  const { isSuccess: confirmed } = useWaitForTransactionReceipt({
-    hash: lastTxHash ?? undefined,
+  const tx = useTxLifecycle({
     chainId,
-    query: { enabled: Boolean(lastTxHash) },
+    confirmations: 1,
+    invalidateKeys: [["tokens-v3"]],
+    label: "Launch",
   });
 
-  async function create(form: CreateTokenForm) {
-    if (!address) {
-      setError("Connect wallet first.");
-      return;
-    }
-    if (!contracts?.factory || contracts.factory === "0x0000000000000000000000000000000000000000") {
-      setError("Factory not configured for this chain.");
-      return;
-    }
-    setError(null);
-    setPending(true);
-    try {
-      // Auto-switch chain if wallet is on a different chain
-      if (activeChainId !== chainId) {
-        try {
-          await switchChainAsync({ chainId });
-        } catch (switchErr) {
-          setError(`Please switch your wallet to the target network. ${switchErr instanceof Error ? switchErr.message : ""}`);
-          setPending(false);
-          return;
-        }
+  const create = useCallback(
+    async (form: CreateTokenForm) => {
+      if (!contracts?.factory || contracts.factory === ZERO) {
+        return null;
       }
-
       const createArgs = {
         name: form.name,
         symbol: form.symbol,
@@ -67,45 +58,25 @@ export function useCreateToken(chainId: number) {
         supplyTier: form.supplyTier,
         curveShape: form.curveShape,
       };
-
-      // Step 1: Try wagmi's auto gas estimation (no gas param = auto-estimate)
-      try {
-        const hash = await writeContractAsync({
-          abi: moonFactoryAbi,
-          address: contracts.factory,
-          functionName: "createToken",
-          args: [createArgs],
-          chainId,
-          // No gas param → wagmi auto-estimates via eth_estimateGas
-        });
-        setLastTxHash(hash);
-        return;
-      } catch (estErr) {
-        const estMsg = parseContractError(estErr);
-        // If it's a user rejection or a real contract revert, don't retry
-        if (/reject|denied|cancel/i.test(estMsg) || /EmptyName|EmptySymbol|InvalidMaxTx|InvalidMaxHold|InvalidCooldown|InvalidSupplyTier|InvalidCurveShape/.test(estMsg)) {
-          throw estErr;
-        }
-        // If gas estimation failed (null/destructure error), retry with explicit gas
-        // This happens with some wallets that can't estimate multi-call factory functions
-      }
-
-      // Step 2: Fallback — send with explicit high gas limit
-      const hash = await writeContractAsync({
+      return tx.execute({
         abi: moonFactoryAbi,
         address: contracts.factory,
         functionName: "createToken",
         args: [createArgs],
-        chainId,
-        gas: 5_000_000n, // fallback: 5M gas (actual usage ~2.5M)
+        gasFallback: 5_000_000n,
       });
-      setLastTxHash(hash);
-    } catch (e) {
-      setError(parseContractError(e));
-    } finally {
-      setPending(false);
-    }
-  }
+    },
+    [contracts, tx],
+  );
 
-  return { create, pending, error, confirmed, lastTxHash, clearError: () => setError(null) };
+  return {
+    create,
+    lifecycle: tx,
+    pending: tx.isBusy,
+    error: tx.error?.message ?? null,
+    confirmed: tx.isSuccess,
+    lastTxHash: tx.hash,
+    clearError: tx.reset,
+    reset: tx.reset,
+  };
 }

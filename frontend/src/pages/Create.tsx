@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useAccount, useChainId } from "wagmi";
-import { useCreateToken, type CreateTokenForm } from "@/hooks/useCreateToken";
+import { useCreateToken, validateCreateForm, type CreateTokenForm } from "@/hooks/useCreateToken";
 import { useNetworkMode } from "@/stores/networkMode";
 import { chainMeta } from "@/config/chains";
+import { TxProgress } from "@/components/tx/TxProgress";
 import { Rocket, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, SlidersHorizontal, Globe } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Link } from "react-router-dom";
@@ -33,19 +34,35 @@ export function Create() {
   const walletChainId = useChainId();
   // Use the wallet's active chain if connected; otherwise fall back to the
   // network mode default (first active chain for mainnet/testnet).
-  const chainId = walletChainId ?? defaultChainId;
+  const chainId = walletChainId || defaultChainId;
   const [form, setForm] = useState<CreateTokenForm>(DEFAULTS);
-  const { create, pending, error, confirmed } = useCreateToken(chainId);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const { create, lifecycle, pending, error, confirmed } = useCreateToken(chainId);
 
-  const set = <K extends keyof CreateTokenForm>(key: K, value: CreateTokenForm[K]) =>
+  const set = <K extends keyof CreateTokenForm>(key: K, value: CreateTokenForm[K]) => {
+    setValidationError(null);
     setForm((f) => ({ ...f, [key]: value }));
+  };
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    const invalid = validateCreateForm(form);
+    if (invalid) {
+      setValidationError(invalid);
+      return;
+    }
+    if (unsupportedChain) {
+      setValidationError("Your wallet is on an unsupported network. Switch networks to launch.");
+      return;
+    }
+    setValidationError(null);
     create(form);
   }
 
   const activeChain = chainMeta[chainId];
+  // Warn when the wallet is connected but sitting on a chain we don't support
+  // (no metadata / factory). The launch would otherwise fail deep in the hook.
+  const unsupportedChain = Boolean(address) && Boolean(walletChainId) && !activeChain;
 
   return (
     <div className="py-6 animate-fade-in-up">
@@ -62,6 +79,13 @@ export function Create() {
           {!address && (
             <div className="card flex items-center gap-2 border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-300">
               <AlertCircle className="h-4 w-4 shrink-0" /> Connect your wallet to launch a token.
+            </div>
+          )}
+
+          {unsupportedChain && (
+            <div className="card flex items-center gap-2 border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-300">
+              <AlertCircle className="h-4 w-4 shrink-0" /> Your wallet is on an unsupported network. Switch to a
+              supported {mode} chain to launch.
             </div>
           )}
 
@@ -199,28 +223,25 @@ export function Create() {
               </div>
             </details>
 
-            {error && (
-              <div className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-300 animate-fade-in">
+            {(validationError || (error && !pending)) && (
+              <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-300 animate-fade-in">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span className="break-words">{error}</span>
+                <span className="break-words">{validationError ?? error}</span>
               </div>
             )}
 
-            {/* Multi-step progress during launch */}
-            {pending && (
-              <div className="rounded-xl border border-moon-500/20 bg-moon-500/5 p-4 space-y-3 animate-fade-in">
-                <div className="flex items-center gap-2 text-sm font-medium text-moon-300">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Launching {form.name || "token"}…
-                </div>
-                <div className="space-y-2">
-                  <ProgressStep done={false} active label="Preparing transaction…" />
-                  <ProgressStep done={false} active={false} label="Waiting for wallet confirmation…" />
-                  <ProgressStep done={false} active={false} label="Confirming on blockchain…" />
-                  <ProgressStep done={false} active={false} label="Token live!" />
-                </div>
-              </div>
-            )}
+            {/* Transaction lifecycle: preparing / signature / confirming / success / error */}
+            <TxProgress
+              stage={lifecycle.stage}
+              chainId={chainId}
+              confirmations={lifecycle.confirmations}
+              confirmationCount={lifecycle.confirmationCount}
+              explorerUrl={lifecycle.explorerUrl}
+              gasEstimate={lifecycle.gasEstimate}
+              nativeSymbol={activeChain?.nativeSymbol ?? "ETH"}
+              error={lifecycle.error}
+              onRetry={lifecycle.retry}
+            />
 
             {confirmed && !pending && (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-2 animate-fade-in">
@@ -239,7 +260,7 @@ export function Create() {
 
             <button
               type="submit"
-              disabled={pending || !address}
+              disabled={pending || !address || unsupportedChain}
               className={cn(
                 "btn-primary w-full !py-3 text-base transition-all",
                 pending && "opacity-50 cursor-not-allowed",
@@ -383,6 +404,7 @@ function PreviewStat({ label, value }: { label: string; value: string }) {
 }
 
 function CurvePreview({ shape, active }: { shape: number; active: boolean }) {
+  const gradientId = `curve-grad-${shape}`;
   const paths = [
     "M 0 30 Q 15 28 30 22 T 60 8", // Linear
     "M 0 30 Q 30 30 60 5", // Exponential
@@ -390,9 +412,9 @@ function CurvePreview({ shape, active }: { shape: number; active: boolean }) {
   ];
   return (
     <svg width="60" height="32" className={cn("transition-opacity", active ? "opacity-100" : "opacity-40")}>
-      <path d={paths[shape]} fill="none" stroke="url(#grad)" strokeWidth="2" strokeLinecap="round" />
+      <path d={paths[shape]} fill="none" stroke={`url(#${gradientId})`} strokeWidth="2" strokeLinecap="round" />
       <defs>
-        <linearGradient id="grad" x1="0" y1="0" x2="1" y2="0">
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#a855f7" />
           <stop offset="100%" stopColor="#ec4899" />
         </linearGradient>
@@ -401,27 +423,4 @@ function CurvePreview({ shape, active }: { shape: number; active: boolean }) {
   );
 }
 
-function ProgressStep({ done, active, label }: { done: boolean; active: boolean; label: string }) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <div className={cn(
-        "flex h-5 w-5 items-center justify-center rounded-full shrink-0 transition-all",
-        done ? "bg-emerald-500 text-white" : active ? "bg-moon-500 text-white animate-pulse" : "bg-white/[0.06] text-neutral-600",
-      )}>
-        {done ? (
-          <CheckCircle2 className="h-3 w-3" />
-        ) : active ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
-        ) : (
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-        )}
-      </div>
-      <span className={cn(
-        "text-xs transition-colors",
-        done ? "text-emerald-400" : active ? "text-moon-300 font-medium" : "text-neutral-600",
-      )}>
-        {label}
-      </span>
-    </div>
-  );
-}
+

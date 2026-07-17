@@ -8,9 +8,11 @@ interface IMoonV3Concentrator {
     /* ─────────────────────────  Errors  ───────────────────────── */
 
     error ZeroAmount();
+    error ZeroAddress();
     error InvalidRange();
     error RescueBlocked();
     error NotAuthorized();
+    error NotImplemented();
 
     /* ─────────────────────────  Events  ───────────────────────── */
 

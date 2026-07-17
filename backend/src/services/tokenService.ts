@@ -43,11 +43,14 @@ export const tokenService = {
         : sort === "graduated"
           ? { graduated: "desc" as const }
           : { volume24h: "desc" as const };
-    return prisma.token.findMany({ where, orderBy, take: limit });
+    const rows = await prisma.token.findMany({ where, orderBy, take: limit });
+    // Add `holders` alias for frontend compat (Prisma schema uses `holderCount`)
+    return rows.map((r: { holderCount: number }) => ({ ...r, holders: r.holderCount }));
   },
 
   async get(chainId: number, address: string) {
-    return prisma.token.findUnique({ where: { chainId_address: { chainId, address } } });
+    const row = await prisma.token.findUnique({ where: { chainId_address: { chainId, address } } });
+    return row ? { ...row, holders: row.holderCount } : null;
   },
 
   async markGraduated(chainId: number, address: string, dexPair: string) {
@@ -66,15 +69,18 @@ export const tokenService = {
   },
 
   async search(q: string, limit = 20) {
-    return prisma.token.findMany({
+    const rows = await prisma.token.findMany({
       where: {
         OR: [
           { name: { contains: q, mode: "insensitive" } },
           { symbol: { contains: q, mode: "insensitive" } },
+          { address: { contains: q, mode: "insensitive" } },
+          { creator: { contains: q, mode: "insensitive" } },
         ],
       },
       take: limit,
       orderBy: { volume24h: "desc" },
     });
+    return rows.map((r: { holderCount: number }) => ({ ...r, holders: r.holderCount }));
   },
 };

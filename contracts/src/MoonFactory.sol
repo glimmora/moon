@@ -4,11 +4,9 @@ pragma solidity 0.8.24;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
-import {MoonToken} from "src/MoonToken.sol";
 import {BondingCurve} from "src/BondingCurve.sol";
 import {IMoonToken} from "src/interfaces/IMoonToken.sol";
 import {IMoonFactory} from "src/interfaces/IMoonFactory.sol";
-import {IBondingCurve} from "src/interfaces/IBondingCurve.sol";
 import {IFeeRouter} from "src/interfaces/IFeeRouter.sol";
 import {ICreatorFeeVault} from "src/interfaces/ICreatorFeeVault.sol";
 import {IReferralRegistry} from "src/interfaces/IReferralRegistry.sol";
@@ -44,6 +42,13 @@ contract MoonFactory is AccessControl, IMoonFactory {
     uint8 public constant EXPONENTIAL = 1;
     uint8 public constant LOGARITHMIC = 2;
 
+    /// @dev Emitted when an infra role grant fails (non-blocking try/catch).
+    event RoleGrantFailed(string role, address curve);
+    /// @dev Emitted when the $MOON token address is updated.
+    event MoonTokenUpdated(address indexed oldToken, address indexed newToken);
+    /// @dev Emitted when the DEX router used at graduation is updated.
+    event DexRouterUpdated(address indexed oldRouter, address indexed newRouter);
+
     /* ───────────────────────  Storage  ────────────────────────── */
 
     address public feeRouter;
@@ -52,6 +57,7 @@ contract MoonFactory is AccessControl, IMoonFactory {
     address public v3Concentrator;
     address public treasury;
     address public moonToken; // $MOON governance token (optional, for buyback)
+    address public dexRouter; // AUDIT-FIX H1: Uniswap V2 router used to seed LP at graduation
 
     address public moonTokenImpl;
     address public bondingCurveImpl;
@@ -139,7 +145,7 @@ contract MoonFactory is AccessControl, IMoonFactory {
             feeRouter,
             creatorFeeVault,
             referralRegistry,
-            address(0), // dex router set later via graduate path / per-chain
+            dexRouter, // AUDIT-FIX H1: pass the configured DEX router so graduation seeds LP
             params.curveShape,
             totalSupplyInit,
             realTokenReservesInit,
@@ -148,16 +154,17 @@ contract MoonFactory is AccessControl, IMoonFactory {
         );
 
         // Grant the curve the roles it needs on the shared infra (non-blocking try/catch).
-        try IFeeRouter(feeRouter).grantCallerRole(curve) {} catch {}
-        try ICreatorFeeVault(creatorFeeVault).grantAccruerRole(curve) {} catch {}
-        try IReferralRegistry(referralRegistry).grantReferrerRole(curve) {} catch {}
+        // Emit events on failure so off-chain indexers can detect and retry.
+        try IFeeRouter(feeRouter).grantCallerRole(curve) {} catch { emit RoleGrantFailed("grantCallerRole", curve); }
+        try ICreatorFeeVault(creatorFeeVault).grantAccruerRole(curve) {} catch { emit RoleGrantFailed("grantAccruerRole", curve); }
+        try IReferralRegistry(referralRegistry).grantReferrerRole(curve) {} catch { emit RoleGrantFailed("grantReferrerRole", curve); }
 
         // AUDIT-FIX CRITICAL: Grant the curve MINTER_ROLE on the token so it can
         // mint (on buy) and burnFrom (on sell). The factory has MINTER_ROLE from
         // initialize(), and as MINTER it can grant the role to the curve.
-        try IMoonToken(token).grantMinterRole(curve) {} catch {}
+        try IMoonToken(token).grantMinterRole(curve) {} catch { emit RoleGrantFailed("grantMinterRole", curve); }
         // Also exempt the curve from token transfer limits (max-tx/max-hold/cooldown).
-        try IMoonToken(token).setExempt(curve, true) {} catch {}
+        try IMoonToken(token).setExempt(curve, true) {} catch { emit RoleGrantFailed("setExempt", curve); }
 
         allTokens.push(token);
 
@@ -241,7 +248,34 @@ contract MoonFactory is AccessControl, IMoonFactory {
     }
 
     function setMoonToken(address moonToken_) external onlyRole(ADMIN_ROLE) {
+        emit MoonTokenUpdated(moonToken, moonToken_);
         moonToken = moonToken_;
+    }
+
+    function setFeeRouter(address feeRouter_) external onlyRole(ADMIN_ROLE) {
+        if (feeRouter_ == address(0)) revert ZeroAddress();
+        emit FeeRouterUpdated(feeRouter, feeRouter_);
+        feeRouter = feeRouter_;
+    }
+
+    function setCreatorFeeVault(address creatorFeeVault_) external onlyRole(ADMIN_ROLE) {
+        if (creatorFeeVault_ == address(0)) revert ZeroAddress();
+        emit CreatorFeeVaultUpdated(creatorFeeVault, creatorFeeVault_);
+        creatorFeeVault = creatorFeeVault_;
+    }
+
+    function setReferralRegistry(address referralRegistry_) external onlyRole(ADMIN_ROLE) {
+        if (referralRegistry_ == address(0)) revert ZeroAddress();
+        emit ReferralRegistryUpdated(referralRegistry, referralRegistry_);
+        referralRegistry = referralRegistry_;
+    }
+
+    /// @notice Set the Uniswap V2 router used to seed LP when tokens graduate.
+    /// @dev AUDIT-FIX H1: applies to tokens created AFTER this call. address(0) disables
+    ///      graduation LP seeding (tokens still graduate; reserved supply is minted).
+    function setDexRouter(address dexRouter_) external onlyRole(ADMIN_ROLE) {
+        emit DexRouterUpdated(dexRouter, dexRouter_);
+        dexRouter = dexRouter_;
     }
 
     /* ───────────────────────  Getters  ────────────────────────── */

@@ -1,12 +1,16 @@
 import { useMemo, useState } from "react";
 import { useTokenDetail, useCurveState } from "@/hooks/useTokenDetail";
 import { useTrade } from "@/hooks/useTrade";
-import { useAccount } from "wagmi";
+import { useReferrer } from "@/hooks/useReferrer";
+import { useAccount, useReadContract, useBlockNumber } from "wagmi";
+import { moonTokenAbi } from "@/abi/MoonToken";
 import { formatEther, parseEther, type Address } from "viem";
 import { getBuyOut, getSellOut, type CurveReserves, CurveShape } from "@/lib/curve";
 import { formatToken, formatPrice, shortenAddress } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { ArrowDownToLine, ArrowUpFromLine, Loader2, AlertCircle, Settings2, Check } from "lucide-react";
+import { chainMeta } from "@/config/chains";
+import { TxProgress } from "@/components/tx/TxProgress";
+import { ArrowDownToLine, ArrowUpFromLine, Loader2, AlertCircle, Settings2 } from "lucide-react";
 
 interface TradePanelProps {
   chainId: number;
@@ -22,15 +26,28 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
   const { meta } = useTokenDetail(chainId, tokenAddress);
   const reads = useCurveState(chainId, curveAddress);
   const trade = useTrade({ chainId, curveAddress });
+  const referrer = useReferrer();
+
+  const { data: currentBlockNumber } = useBlockNumber({ chainId });
 
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [slippage, setSlippage] = useState(1);
 
+  const { data: tokenBalance } = useReadContract({
+    abi: moonTokenAbi,
+    address: tokenAddress,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    chainId,
+    query: { enabled: Boolean(address) && side === "sell" },
+  });
+
   const reserves: CurveReserves | undefined = useMemo(() => {
     if (!reads.data || reads.data.some((r) => r.status !== "success")) return undefined;
-    const [, rt, rq, vt, vq, tsInit, cBlock] = reads.data.map((r) => r.result) as bigint[];
+    const results = reads.data.map((r) => r.result);
+    const [rt, rq, vt, vq, tsInit, cBlock] = results as [bigint, bigint, bigint, bigint, bigint, bigint];
     return {
       realToken: rt,
       realQuote: rq,
@@ -38,10 +55,10 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
       virtualQuote: vq,
       totalSupplyInit: tsInit,
       creationBlock: cBlock,
-      currentBlock: cBlock + 10n,
+      currentBlock: currentBlockNumber ?? cBlock + 10n,
       curveShape: (meta.data?.curveShape ?? 0) as CurveShape,
     };
-  }, [reads.data, meta.data]);
+  }, [reads.data, meta.data, currentBlockNumber]);
 
   const quote = useMemo(() => {
     if (!reserves || !amount) return null;
@@ -51,11 +68,23 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
       if (side === "buy") {
         const { tokensOut, fee } = getBuyOut(reserves, amt);
         const minOut = (tokensOut * BigInt(Math.floor((100 - slippage) * 100))) / 10000n;
-        return { out: tokensOut, minOut, fee, outLabel: `${formatToken(tokensOut)} ${tokenSymbol}` };
+        return {
+          out: tokensOut,
+          minOut,
+          fee,
+          outLabel: `${formatToken(tokensOut)} ${tokenSymbol}`,
+          minOutLabel: `${formatToken(minOut)} ${tokenSymbol}`,
+        };
       }
       const { netQuoteOut, fee } = getSellOut(reserves, amt);
       const minOut = (netQuoteOut * BigInt(Math.floor((100 - slippage) * 100))) / 10000n;
-      return { out: netQuoteOut, minOut, fee, outLabel: `${formatPrice(netQuoteOut)}` };
+      return {
+        out: netQuoteOut,
+        minOut,
+        fee,
+        outLabel: `${formatPrice(netQuoteOut)}`,
+        minOutLabel: `${formatPrice(minOut)}`,
+      };
     } catch {
       return null;
     }
@@ -65,12 +94,26 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
     ? Number(formatEther((reserves.virtualQuote * 10n ** 18n) / (reserves.virtualToken || 1n)))
     : 0;
 
+  // On sell, block the trade when the entered amount exceeds the wallet balance so
+  // the user gets an inline message instead of an on-chain revert.
+  const insufficientBalance = useMemo(() => {
+    if (side !== "sell" || !amount || tokenBalance === undefined || tokenBalance === null) return false;
+    try {
+      return parseEther(amount) > (tokenBalance as bigint);
+    } catch {
+      return false;
+    }
+  }, [side, amount, tokenBalance]);
+
   function submit() {
-    if (!quote || !amount) return;
+    if (!quote || !amount || insufficientBalance) return;
+    // Don't self-refer — pass the referrer only when it differs from the trader.
+    const ref =
+      referrer && address && referrer.toLowerCase() !== address.toLowerCase() ? referrer : undefined;
     if (side === "buy") {
-      trade.buy(amount, quote.minOut);
+      trade.buy(amount, quote.minOut, ref);
     } else {
-      trade.sell(parseEther(amount), quote.minOut);
+      trade.sell(parseEther(amount), quote.minOut, ref);
     }
   }
 
@@ -140,8 +183,14 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
       <div>
         <label className="mb-1.5 block text-xs text-neutral-500 flex items-center justify-between">
           <span>{side === "buy" ? "You pay" : "You sell"}</span>
-          {address && side === "sell" && (
-            <button className="text-moon-400 hover:text-moon-300 text-[10px] font-medium">MAX</button>
+          {address && side === "sell" && tokenBalance !== undefined && tokenBalance !== null && (
+            <button
+              type="button"
+              className="text-moon-400 hover:text-moon-300 text-[10px] font-medium"
+              onClick={() => setAmount(formatToken(tokenBalance as bigint))}
+            >
+              MAX
+            </button>
           )}
         </label>
         <div className="relative">
@@ -183,23 +232,36 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
             badge={Number(quote.fee) / 1e18 > 0.5 ? "anti-sniper" : undefined}
           />
           <div className="h-px bg-white/[0.04] my-1" />
-          <Row label="Min received" value={quote.outLabel} muted />
+          <Row label="Min received" value={quote.minOutLabel} muted />
           <Row label="Slippage" value={`${slippage}%`} muted />
         </div>
       )}
 
-      {/* Error */}
-      {trade.error && (
-        <div className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-300 animate-fade-in">
+      {/* Insufficient balance warning */}
+      {insufficientBalance && (
+        <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-300 animate-fade-in">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span className="break-words">{trade.error}</span>
+          <span>Amount exceeds your {tokenSymbol} balance.</span>
         </div>
       )}
+
+      {/* Transaction lifecycle: preparing / signature / confirming / success / error */}
+      <TxProgress
+        stage={trade.lifecycle.stage}
+        chainId={chainId}
+        confirmations={trade.lifecycle.confirmations}
+        confirmationCount={trade.lifecycle.confirmationCount}
+        explorerUrl={trade.lifecycle.explorerUrl}
+        gasEstimate={trade.lifecycle.gasEstimate}
+        nativeSymbol={chainMeta[chainId]?.nativeSymbol ?? "ETH"}
+        error={trade.lifecycle.error}
+        onRetry={trade.lifecycle.retry}
+      />
 
       {/* Submit */}
       <button
         onClick={submit}
-        disabled={!quote || !amount || trade.pending || !address}
+        disabled={!quote || !amount || trade.pending || !address || insufficientBalance}
         className={cn(
           "btn w-full !py-3 text-base",
           side === "buy" ? "btn-success" : "btn-danger",
@@ -214,13 +276,6 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
         )}
         {!address ? "Connect Wallet" : side === "buy" ? "Buy" : "Sell"}
       </button>
-
-      {/* Status */}
-      {trade.confirmed && (
-        <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-400 animate-fade-in">
-          <Check className="h-3.5 w-3.5" /> Transaction confirmed!
-        </div>
-      )}
 
       {address && (
         <p className="text-center text-[10px] text-neutral-600 font-mono">{shortenAddress(address)}</p>

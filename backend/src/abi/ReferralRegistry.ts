@@ -72,4 +72,27 @@ export const referralRegistryAbi = [
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
   },
+  {
+    type: "event",
+    name: "ReferralRecorded",
+    inputs: [
+      { name: "trader", type: "address", indexed: true },
+      { name: "referrer", type: "address", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "tradeVolume", type: "uint256", indexed: false },
+      { name: "rewardAmount", type: "uint256", indexed: false },
+      { name: "quoteAsset", type: "address", indexed: false },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "RewardsClaimed",
+    inputs: [
+      { name: "referrer", type: "address", indexed: true },
+      { name: "quoteAsset", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+    anonymous: false,
+  },
 ] as const;

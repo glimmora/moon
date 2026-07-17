@@ -1,30 +1,36 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Home } from "@/pages/Home";
-import { Advanced } from "@/pages/Advanced";
-import { Create } from "@/pages/Create";
-import { TokenDetail } from "@/pages/TokenDetail";
-import { Claim } from "@/pages/Claim";
-import { Referral } from "@/pages/Referral";
-import { Watchlist } from "@/pages/Watchlist";
-import { Portfolio } from "@/pages/Portfolio";
-import { Leaderboard } from "@/pages/Leaderboard";
 import { NotFound } from "@/pages/NotFound";
+
+const Advanced = lazy(() => import("@/pages/Advanced").then((m) => ({ default: m.Advanced })));
+const Create = lazy(() => import("@/pages/Create").then((m) => ({ default: m.Create })));
+const TokenDetail = lazy(() => import("@/pages/TokenDetail").then((m) => ({ default: m.TokenDetail })));
+const Claim = lazy(() => import("@/pages/Claim").then((m) => ({ default: m.Claim })));
+const Referral = lazy(() => import("@/pages/Referral").then((m) => ({ default: m.Referral })));
+const Watchlist = lazy(() => import("@/pages/Watchlist").then((m) => ({ default: m.Watchlist })));
+const Portfolio = lazy(() => import("@/pages/Portfolio").then((m) => ({ default: m.Portfolio })));
+const Leaderboard = lazy(() => import("@/pages/Leaderboard").then((m) => ({ default: m.Leaderboard })));
+
+function LazyPage({ element }: { element: React.ReactElement }) {
+  return <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh]"><div className="h-8 w-8 rounded-full border-2 border-moon-500/30 border-t-moon-500 animate-spin" /></div>}>{element}</Suspense>;
+}
 
 export default function App() {
   return (
     <Layout>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/advanced" element={<Advanced />} />
-        <Route path="/create" element={<Create />} />
-        <Route path="/token/:chainId/:address" element={<TokenDetail />} />
-        <Route path="/portfolio" element={<Portfolio />} />
-        <Route path="/portfolio/:address" element={<Portfolio />} />
-        <Route path="/leaderboard" element={<Leaderboard />} />
-        <Route path="/claim" element={<Claim />} />
-        <Route path="/referral" element={<Referral />} />
-        <Route path="/watchlist" element={<Watchlist />} />
+        <Route path="/advanced" element={<LazyPage element={<Advanced />} />} />
+        <Route path="/create" element={<LazyPage element={<Create />} />} />
+        <Route path="/token/:chainId/:address" element={<LazyPage element={<TokenDetail />} />} />
+        <Route path="/portfolio" element={<LazyPage element={<Portfolio />} />} />
+        <Route path="/portfolio/:address" element={<LazyPage element={<Portfolio />} />} />
+        <Route path="/leaderboard" element={<LazyPage element={<Leaderboard />} />} />
+        <Route path="/claim" element={<LazyPage element={<Claim />} />} />
+        <Route path="/referral" element={<LazyPage element={<Referral />} />} />
+        <Route path="/watchlist" element={<LazyPage element={<Watchlist />} />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>

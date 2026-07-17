@@ -14,6 +14,7 @@ interface ICreatorFeeVault {
     error ZeroAmount();
     error NoClaimable();
     error InvalidToken();
+    error ZeroAddress();
 
     /* ─────────────────────────  Events  ───────────────────────── */
 

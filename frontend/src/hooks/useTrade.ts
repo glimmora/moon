@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain, useChainId } from "wagmi";
+import { useCallback } from "react";
 import { parseEther, type Address } from "viem";
 import { bondingCurveAbi } from "@/abi/BondingCurve";
-import { parseContractError } from "@/lib/error";
+import { useTxLifecycle } from "@/hooks/useTxLifecycle";
 
 export interface UseTradeArgs {
   chainId: number;
@@ -11,103 +10,82 @@ export interface UseTradeArgs {
 
 export type TradeSide = "buy" | "sell";
 
+const ZERO = "0x0000000000000000000000000000000000000000" as const;
+
+const TRADE_INVALIDATE = [
+  ["token-meta"],
+  ["holders"],
+  ["bubblemap"],
+  ["tokens-v3"],
+  ["price-history"],
+] as const;
+
+/**
+ * Buy/sell against a bonding curve, powered by the shared transaction lifecycle
+ * (chain-switch -> estimate -> sign -> confirm) with toast + query invalidation.
+ * Exposes the full lifecycle object plus the legacy fields TradePanel relies on.
+ */
 export function useTrade({ chainId, curveAddress }: UseTradeArgs) {
-  const { address } = useAccount();
-  const activeChainId = useChainId();
-  const { switchChainAsync } = useSwitchChain();
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [lastTxHash, setLastTxHash] = useState<`0x${string}` | null>(null);
-
-  const { writeContractAsync } = useWriteContract();
-
-  const { isSuccess: confirmed } = useWaitForTransactionReceipt({
-    hash: lastTxHash ?? undefined,
+  const tx = useTxLifecycle({
     chainId,
-    query: { enabled: Boolean(lastTxHash) },
+    confirmations: 1,
+    invalidateKeys: TRADE_INVALIDATE,
+    label: "Trade",
   });
 
-  /** Auto-switch the wallet to the target chain if mismatched. */
-  async function ensureChain(): Promise<boolean> {
-    if (activeChainId === chainId) return true;
-    try {
-      await switchChainAsync({ chainId });
-      return true;
-    } catch (e) {
-      setError(`Please switch your wallet to the target network. ${e instanceof Error ? e.message : ""}`);
-      return false;
-    }
-  }
-
-  async function buy(quoteAmountIn: string, minTokensOut: bigint, referrer?: Address) {
-    if (!address) {
-      setError("Connect wallet first.");
-      return;
-    }
-    // AUDIT-FIX I-2: Validate the input before calling parseEther.
-    const trimmed = quoteAmountIn.trim();
-    if (!trimmed || !/^\d*\.?\d+$/.test(trimmed)) {
-      setError("Enter a valid amount.");
-      return;
-    }
-    setError(null);
-    setPending(true);
-    try {
-      const value = parseEther(trimmed);
-      if (value <= 0n) {
-        setError("Amount must be greater than 0.");
-        setPending(false);
-        return;
+  const buy = useCallback(
+    async (quoteAmountIn: string, minTokensOut: bigint, referrer?: Address) => {
+      const trimmed = quoteAmountIn.trim();
+      if (!trimmed || !/^\d*\.?\d+$/.test(trimmed)) {
+        return tx.execute({
+          abi: bondingCurveAbi,
+          address: curveAddress,
+          functionName: "buy",
+          args: [0n, minTokensOut, referrer ?? ZERO],
+          value: 0n,
+        }).then(() => null);
       }
-      // Auto-switch chain if needed
-      if (!(await ensureChain())) {
-        setPending(false);
-        return;
+      let value: bigint;
+      try {
+        value = parseEther(trimmed);
+      } catch {
+        return null;
       }
-      const hash = await writeContractAsync({
+      if (value <= 0n) return null;
+      return tx.execute({
         abi: bondingCurveAbi,
         address: curveAddress,
         functionName: "buy",
-        args: [value, minTokensOut, referrer ?? "0x0000000000000000000000000000000000000000"],
+        args: [value, minTokensOut, referrer ?? ZERO],
         value,
-        chainId,
       });
-      setLastTxHash(hash);
-    } catch (e) {
-      setError(parseContractError(e));
-    } finally {
-      setPending(false);
-    }
-  }
+    },
+    [curveAddress, tx],
+  );
 
-  // AUDIT-FIX H-1/M-2: sell() now accepts referrer parameter
-  async function sell(tokenAmountIn: bigint, minQuoteOut: bigint, referrer?: Address) {
-    if (!address) {
-      setError("Connect wallet first.");
-      return;
-    }
-    setError(null);
-    setPending(true);
-    try {
-      // Auto-switch chain if needed
-      if (!(await ensureChain())) {
-        setPending(false);
-        return;
-      }
-      const hash = await writeContractAsync({
+  const sell = useCallback(
+    async (tokenAmountIn: bigint, minQuoteOut: bigint, referrer?: Address) => {
+      if (tokenAmountIn <= 0n) return null;
+      return tx.execute({
         abi: bondingCurveAbi,
         address: curveAddress,
         functionName: "sell",
-        args: [tokenAmountIn, minQuoteOut, referrer ?? "0x0000000000000000000000000000000000000000"],
-        chainId,
+        args: [tokenAmountIn, minQuoteOut, referrer ?? ZERO],
       });
-      setLastTxHash(hash);
-    } catch (e) {
-      setError(parseContractError(e));
-    } finally {
-      setPending(false);
-    }
-  }
+    },
+    [curveAddress, tx],
+  );
 
-  return { buy, sell, pending, error, confirmed, lastTxHash, clearError: () => setError(null) };
+  return {
+    buy,
+    sell,
+    // Full lifecycle surface for TxProgress rendering.
+    lifecycle: tx,
+    // Legacy-compatible fields.
+    pending: tx.isBusy,
+    error: tx.error?.message ?? null,
+    confirmed: tx.isSuccess,
+    lastTxHash: tx.hash,
+    clearError: tx.reset,
+  };
 }

@@ -25,6 +25,7 @@ interface IMoonToken is IERC20 {
     event Initialized(address indexed factory, uint256 totalSupplyInit, uint8 supplyTier);
     event ExemptSet(address indexed account, bool exempt);
     event LimitsUpdated(uint256 maxTxBps, uint256 maxHoldBps, uint256 cooldownSeconds);
+    event MinterRoleGranted(address indexed account);
 
     /* ─────────────────────────  Roles  ────────────────────────── */
 

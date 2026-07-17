@@ -1,5 +1,7 @@
-version: "3.9"
-
+# Dev-only Postgres for running the backend locally (`pnpm dev`).
+# For the full production stack (db + backend + frontend) use the root
+# ../docker-compose.yml instead. DB name/user/password match that stack so a
+# single DATABASE_URL (postgresql://moon:moon@localhost:5432/moonfun) works for both.
 services:
   postgres:
     image: postgres:16-alpine
@@ -19,20 +21,5 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: moonfun-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - moonfun-redisdata:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 volumes:
   moonfun-pgdata:
-  moonfun-redisdata:

@@ -92,31 +92,50 @@ contract MoonBurner is AccessControl, Pausable, IMoonBurner {
             IERC20(quoteAsset).forceApprove(dexRouter, quoteAmount);
         }
 
+        // Pre-compute a minimum output amount to protect against sandwich attacks.
+        // If getAmountsOut fails (e.g. no liquidity yet), fall back to 0.
+        uint256 minOut;
+        try IUniswapV2Router02(dexRouter).getAmountsOut(quoteAmount, path) returns (uint256[] memory amountsOut) {
+            minOut = (amountsOut[amountsOut.length - 1] * 95) / 100; // 5% slippage tolerance
+        } catch {
+            minOut = 0;
+        }
+
         uint256 moonBefore = IERC20(moonToken).balanceOf(address(this));
 
-        try IUniswapV2Router02(dexRouter).swapExactTokensForTokens{value: quoteAsset == address(0) ? quoteAmount : 0}(
-            quoteAmount,
-            0,
-            path,
-            address(this),
-            block.timestamp + 300
-        ) returns (uint256[] memory amounts) {
-            moonBought = amounts[amounts.length - 1];
-        } catch {
-            // AUDIT-FIX M-3: Refund native to treasury on swap failure + emit event so the
-            // failure is observable off-chain. The prior `ok;` statement was dead code.
-            if (quoteAsset == address(0)) {
+        if (quoteAsset == address(0)) {
+            // Native ETH → $MOON via swapExactETHForTokens.
+            try IUniswapV2Router02(dexRouter).swapExactETHForTokens{value: quoteAmount}(
+                minOut,
+                path,
+                address(this),
+                block.timestamp + 300
+            ) returns (uint256[] memory amounts) {
+                moonBought = amounts[amounts.length - 1];
+            } catch {
                 (bool refundOk,) = payable(treasury).call{value: quoteAmount}("");
                 if (!refundOk) {
                     emit BuybackSkipped(quoteAmount, "native refund failed");
                 } else {
                     emit BuybackSkipped(quoteAmount, "swap failed - native refunded");
                 }
-            } else {
-                emit BuybackSkipped(quoteAmount, "swap failed");
+                moonBought = 0;
             }
-            moonBought = 0;
+        } else {
+            try IUniswapV2Router02(dexRouter).swapExactTokensForTokens(
+                quoteAmount,
+                minOut,
+                path,
+                address(this),
+                block.timestamp + 300
+            ) returns (uint256[] memory amounts) {
+                moonBought = amounts[amounts.length - 1];
+            } catch {
+                emit BuybackSkipped(quoteAmount, "swap failed");
+                moonBought = 0;
+            }
         }
+
 
         // Ensure we account for actual balance delta (defensive).
         uint256 moonAfter = IERC20(moonToken).balanceOf(address(this));
@@ -138,7 +157,20 @@ contract MoonBurner is AccessControl, Pausable, IMoonBurner {
     }
 
     function setDexRouter(address router) external onlyRole(ADMIN_ROLE) {
+        emit DexRouterUpdated(dexRouter, router);
         dexRouter = router;
+    }
+
+    function setMoonToken(address moonToken_) external onlyRole(ADMIN_ROLE) {
+        if (moonToken_ == address(0)) revert ZeroAddress();
+        moonToken = moonToken_;
+        emit MoonTokenSet(moonToken_);
+    }
+
+    function setTreasury(address treasury_) external onlyRole(ADMIN_ROLE) {
+        if (treasury_ == address(0)) revert ZeroAddress();
+        emit TreasuryUpdated(treasury, treasury_);
+        treasury = treasury_;
     }
 
     /// @inheritdoc IMoonBurner

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/services/api";
-import { Loader2, Activity } from "lucide-react";
+import { Loader2, Activity, LineChart as LineChartIcon, AlertTriangle } from "lucide-react";
 
 interface PriceChartProps {
   chainId: number;
@@ -14,12 +14,14 @@ export function PriceChart({ chainId, tokenAddress }: PriceChartProps) {
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["price-history", chainId, tokenAddress],
     queryFn: () => api.getPriceHistory(chainId, tokenAddress),
     enabled: Boolean(tokenAddress),
     refetchInterval: 15_000,
   });
+
+  const isEmpty = !isLoading && !isError && (!data || data.length === 0);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -62,15 +64,18 @@ export function PriceChart({ chainId, tokenAddress }: PriceChartProps) {
     chartRef.current = chart;
     seriesRef.current = series;
 
-    const handleResize = () => {
-      if (containerRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth });
+    // Track the container's actual size (handles sidebar toggles / layout shifts,
+    // not just window resizes) so the chart never overflows or leaves gaps.
+    const ro = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width && chartRef.current) {
+        chartRef.current.applyOptions({ width: Math.floor(width) });
       }
-    };
-    window.addEventListener("resize", handleResize);
+    });
+    ro.observe(containerRef.current);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
+      ro.disconnect();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -79,6 +84,7 @@ export function PriceChart({ chainId, tokenAddress }: PriceChartProps) {
 
   useEffect(() => {
     if (!seriesRef.current || !data) return;
+    // p.time is in milliseconds (Date.getTime() from the backend API) — convert to seconds for lightweight-charts.
     const points = data.map((p) => ({
       time: Math.floor(p.time / 1000) as UTCTimestamp,
       value: p.priceUsd,
@@ -95,7 +101,43 @@ export function PriceChart({ chainId, tokenAddress }: PriceChartProps) {
         </h3>
         {isLoading && <Loader2 className="h-4 w-4 animate-spin text-neutral-500" />}
       </div>
-      <div ref={containerRef} className="w-full" />
+      <div className="relative min-h-80">
+        <div
+          ref={containerRef}
+          className="w-full"
+          role="img"
+          aria-label={`Price history chart with ${data?.length ?? 0} data points`}
+        />
+        {/* Overlays for non-happy states — the chart container stays mounted so the
+            lightweight-charts instance is never torn down/recreated. */}
+        {(isLoading || isError || isEmpty) && (
+          <div className="absolute inset-0 flex h-80 flex-col items-center justify-center gap-2 text-center">
+            {isLoading ? (
+              <>
+                <Loader2 className="h-6 w-6 animate-spin text-moon-400" />
+                <p className="text-xs text-neutral-500">Loading price history…</p>
+              </>
+            ) : isError ? (
+              <>
+                <AlertTriangle className="h-7 w-7 text-red-400" />
+                <p className="text-sm text-neutral-300">Couldn't load the chart</p>
+                <button
+                  onClick={() => refetch()}
+                  className="mt-1 rounded-lg bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-neutral-200 hover:bg-white/[0.1] transition-colors"
+                >
+                  Retry
+                </button>
+              </>
+            ) : (
+              <>
+                <LineChartIcon className="h-7 w-7 text-neutral-600" />
+                <p className="text-sm text-neutral-400">No trades yet</p>
+                <p className="text-xs text-neutral-600">The price chart appears after the first trade.</p>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

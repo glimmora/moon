@@ -1,6 +1,8 @@
 import { type TokenListItem } from "@/hooks/useTokens";
 
-const BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+/** Single source of truth for the backend base URL (trailing slash stripped). */
+export const API_BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+const BASE = API_BASE;
 
 export interface Holder {
   address: string;
@@ -58,7 +60,7 @@ export interface PortfolioCreatedToken {
   curveShape: number;
   priceUsd: number;
   marketCapUsd: number;
-  holders: number;
+  holderCount: number;
   volume24h: number;
   graduated: boolean;
   createdAt: number;
@@ -104,17 +106,25 @@ export interface LeaderboardToken {
   curveShape: number;
   priceUsd: number;
   marketCapUsd: number;
-  holders: number;
+  holderCount: number;
   volume24h: number;
   graduated: boolean;
   creator: string;
   createdAt: number;
 }
 
+const TIMEOUT_MS = 15_000;
+
 async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
-  return (await res.json()) as T;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(`${BASE}${path}`, { signal: controller.signal });
+    if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export interface TokenMeta {
@@ -134,7 +144,7 @@ export interface TokenMeta {
   dexPair?: string;
   priceUsd: number;
   marketCapUsd: number;
-  holders: number;
+  holderCount: number;
   volume24h: number;
 }
 

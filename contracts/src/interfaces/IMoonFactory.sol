@@ -53,6 +53,9 @@ interface IMoonFactory {
     );
     event MoonTokenImplUpgraded(address indexed newImpl);
     event BondingCurveImplUpgraded(address indexed newImpl);
+    event FeeRouterUpdated(address indexed oldFeeRouter, address indexed newFeeRouter);
+    event CreatorFeeVaultUpdated(address indexed oldVault, address indexed newVault);
+    event ReferralRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
 
     /* ─────────────────────────  Create  ───────────────────────── */
 
@@ -91,4 +94,7 @@ interface IMoonFactory {
 
     function upgradeMoonTokenImpl(address newImpl) external;
     function upgradeBondingCurveImpl(address newImpl) external;
+    function setFeeRouter(address feeRouter_) external;
+    function setCreatorFeeVault(address creatorFeeVault_) external;
+    function setReferralRegistry(address referralRegistry_) external;
 }

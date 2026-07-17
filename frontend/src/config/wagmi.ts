@@ -1,8 +1,18 @@
-import { createConfig, http } from "wagmi";
+import { createConfig, http, fallback } from "wagmi";
 import { getDefaultWallets, darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import type { Chain } from "wagmi/chains";
 import { moonChains } from "./chains";
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? "moon-fun-demo";
+
+// WalletConnect (and RainbowKit's WC-based connectors) need a real projectId from
+// https://cloud.walletconnect.com. Without it, mobile/QR wallet connections fail.
+if (projectId === "moon-fun-demo") {
+  console.warn(
+    "[moon.fun] Using a placeholder WalletConnect projectId. " +
+      "Set VITE_WALLETCONNECT_PROJECT_ID for reliable wallet connections.",
+  );
+}
 
 // RainbowKit v2 + wagmi v2: connectors no longer take `chains`; chains are
 // passed only to createConfig. The empty-array cast satisfies the tuple type.
@@ -11,11 +21,15 @@ const { connectors } = getDefaultWallets({
   projectId,
 });
 
+const typedChains = moonChains as unknown as readonly [Chain, ...Chain[]];
+
 export const wagmiConfig = createConfig({
-  chains: moonChains as unknown as typeof moonChains & readonly [typeof moonChains[number], ...typeof moonChains],
+  chains: typedChains,
   connectors,
   transports: Object.fromEntries(
-    moonChains.map((c) => [c.id, http(c.rpcUrls.default.http[0])]),
+    // Wrap every chain's RPC list in a fallback transport so a single flaky or
+    // rate-limited endpoint automatically rolls over to the next one.
+    moonChains.map((c) => [c.id, fallback(c.rpcUrls.default.http.map((url) => http(url)))]),
   ),
   ssr: false,
 });

@@ -14,6 +14,13 @@ export function Layout({ children }: { children: ReactNode }) {
       "relative min-h-screen flex flex-col overflow-x-hidden",
       isLight ? "bg-neutral-50 text-neutral-900" : "bg-ink-950 text-neutral-100",
     )}>
+      {/* Skip link — first tab stop lets keyboard users jump past the nav. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-moon-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+      >
+        Skip to content
+      </a>
       {/* Aurora background blobs (subtle in light mode) */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
         <div className={cn("aurora-blob h-[400px] w-[400px] -top-32 -left-20 animate-aurora", isLight ? "bg-moon-300/30" : "bg-moon-700/30")} />

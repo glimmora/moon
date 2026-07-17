@@ -16,6 +16,18 @@ export default defineConfig({
   },
   build: {
     target: "es2020",
-    sourcemap: true,
+    // No source maps in production builds — smaller output, no source leakage.
+    sourcemap: process.env.NODE_ENV !== "production",
+    rollupOptions: {
+      output: {
+        // Split heavy vendor libs into separate chunks for better caching and
+        // smaller initial bundle.
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          wallet: ["wagmi", "viem", "@rainbow-me/rainbowkit"],
+          query: ["@tanstack/react-query"],
+        },
+      },
+    },
   },
 });

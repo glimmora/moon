@@ -1,7 +1,9 @@
 import { useHolders, type Holder } from "@/hooks/useHolders";
 import { formatToken, shortenAddress } from "@/lib/format";
-import { chainMeta } from "@/config/chains";
+import { addressUrl } from "@/lib/explorer";
 import { ExternalLink, Users2 } from "lucide-react";
+import { ErrorState } from "@/components/feedback/ErrorState";
+import { Skeleton } from "@/components/feedback/Skeleton";
 
 interface HolderTableProps {
   chainId: number;
@@ -9,15 +11,21 @@ interface HolderTableProps {
 }
 
 export function HolderTable({ chainId, tokenAddress }: HolderTableProps) {
-  const { data, isLoading } = useHolders(chainId, tokenAddress);
-  const meta = chainMeta[chainId];
+  const { data, isLoading, isError, error, refetch } = useHolders(chainId, tokenAddress);
 
   if (isLoading) {
     return (
-      <div className="card p-4">
-        <div className="h-8 w-32 animate-pulse rounded bg-neutral-800" />
+      <div className="card p-4 space-y-2" role="status" aria-label="Loading holders">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-8 w-full" />
+        ))}
+        <span className="sr-only">Loading holders…</span>
       </div>
     );
+  }
+
+  if (isError) {
+    return <ErrorState error={error} title="Couldn't load holders" onRetry={() => refetch()} />;
   }
 
   if (!data || data.length === 0) {
@@ -37,18 +45,19 @@ export function HolderTable({ chainId, tokenAddress }: HolderTableProps) {
       </div>
       <div className="max-h-96 overflow-y-auto">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-neutral-900 text-xs text-neutral-500">
+          <caption className="sr-only">Top token holders with balance, share of supply, and account type</caption>
+          <thead className="sticky top-0 bg-neutral-100 dark:bg-neutral-900 text-xs text-neutral-500">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">#</th>
-              <th className="px-4 py-2 text-left font-medium">Address</th>
-              <th className="px-4 py-2 text-right font-medium">Balance</th>
-              <th className="px-4 py-2 text-right font-medium">%</th>
-              <th className="px-4 py-2 text-right font-medium">Type</th>
+              <th scope="col" className="px-4 py-2 text-left font-medium">#</th>
+              <th scope="col" className="px-4 py-2 text-left font-medium">Address</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">Balance</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">%</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">Type</th>
             </tr>
           </thead>
           <tbody>
             {data.map((h, i) => (
-              <HolderRow key={h.address} holder={h} rank={i + 1} explorer={meta?.explorer ?? ""} />
+              <HolderRow key={h.address} holder={h} rank={i + 1} chainId={chainId} />
             ))}
           </tbody>
         </table>
@@ -57,13 +66,14 @@ export function HolderTable({ chainId, tokenAddress }: HolderTableProps) {
   );
 }
 
-function HolderRow({ holder, rank, explorer }: { holder: Holder; rank: number; explorer: string }) {
+function HolderRow({ holder, rank, chainId }: { holder: Holder; rank: number; chainId: number }) {
+  const isWhale = holder.percentage > 10;
   return (
     <tr className="border-t border-neutral-800/50 hover:bg-neutral-900/50">
-      <td className="px-4 py-2.5 text-neutral-500">{rank}</td>
+      <td className="px-4 py-2.5 text-neutral-500 tabular">{rank}</td>
       <td className="px-4 py-2.5">
         <a
-          href={`${explorer}/address/${holder.address}`}
+          href={addressUrl(chainId, holder.address)}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1 font-mono text-xs text-moon-400 hover:underline"
@@ -74,7 +84,8 @@ function HolderRow({ holder, rank, explorer }: { holder: Holder; rank: number; e
       </td>
       <td className="px-4 py-2.5 text-right font-mono text-xs">{formatToken(BigInt(holder.balance))}</td>
       <td className="px-4 py-2.5 text-right">
-        <span className={holder.percentage > 10 ? "text-yellow-400" : "text-neutral-300"}>
+        <span className={isWhale ? "inline-flex items-center gap-1 font-semibold text-amber-300" : "text-neutral-300"}>
+          {isWhale && <span title="Whale — holds over 10% of supply" aria-label="Whale">🐋</span>}
           {holder.percentage.toFixed(2)}%
         </span>
       </td>

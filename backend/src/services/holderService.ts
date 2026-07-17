@@ -29,17 +29,21 @@ export const holderService = {
   },
 
   async list(chainId: number, tokenAddress: string, limit = 100) {
-    return prisma.holder.findMany({
-      where: { chainId, tokenAddress },
-      orderBy: { balance: "desc" },
-      take: limit,
-    });
+    // Sort by numeric balance using raw ORDER BY — String sort is lexicographic ("9" > "100").
+    const rows = await prisma.$queryRawUnsafe(
+      `SELECT * FROM "Holder"
+       WHERE "chainId" = $1 AND "tokenAddress" = $2
+       ORDER BY CAST("balance" AS NUMERIC) DESC
+       LIMIT $3`,
+      chainId, tokenAddress, limit,
+    ) as { id: string; chainId: number; tokenAddress: string; address: string; balance: string; percentage: number; isContract: boolean; firstSeen: Date; updatedAt: Date }[];
+    return rows;
   },
 
   async bubblemap(chainId: number, tokenAddress: string) {
     const holders = await this.list(chainId, tokenAddress, 50);
     // Connections: stubbed — in production this would trace Transfer edges.
-    return holders.map((h) => ({
+    return holders.map((h: { id: string; address: string; balance: string; percentage: number; isContract: boolean }) => ({
       id: h.address,
       address: h.address,
       balance: h.balance,

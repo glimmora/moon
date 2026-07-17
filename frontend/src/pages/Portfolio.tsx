@@ -1,4 +1,6 @@
 import { useAccount } from "wagmi";
+import { useState } from "react";
+import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import { Link } from "react-router-dom";
@@ -10,18 +12,22 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ExternalLink,
-  Loader2,
   Rocket,
   Activity,
 } from "lucide-react";
 import { formatUsd, shortenAddress, formatToken, timeAgo, formatMarketCap } from "@/lib/format";
 import { chainMeta } from "@/config/chains";
 import { cn } from "@/lib/cn";
+import { ErrorState } from "@/components/feedback/ErrorState";
+import { Skeleton } from "@/components/feedback/Skeleton";
 
 export function Portfolio() {
-  const { address } = useAccount();
+  const params = useParams<{ address: string }>();
+  const { address: walletAddress } = useAccount();
+  const address = params.address ? params.address.toLowerCase() : walletAddress;
+  const [showAllPositions, setShowAllPositions] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["portfolio", address],
     queryFn: () => (address ? api.getPortfolio(address) : Promise.resolve(null)),
     enabled: Boolean(address),
@@ -40,17 +46,52 @@ export function Portfolio() {
     );
   }
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-moon-400" />
+      <div className="space-y-6 py-6" role="status" aria-label="Loading portfolio">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-10 w-10 rounded-xl" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Skeleton className="h-80 lg:col-span-2" />
+          <Skeleton className="h-80" />
+        </div>
+        <span className="sr-only">Loading portfolio…</span>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="py-16">
+        <ErrorState error={error} title="Couldn't load this portfolio" onRetry={() => refetch()} />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="py-16 text-center animate-fade-in-up">
+        <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-moon-500/15 border border-moon-500/20 mb-4">
+          <Wallet className="h-8 w-8 text-moon-400" />
+        </div>
+        <h1 className="text-3xl font-bold font-display">Your Portfolio</h1>
+        <p className="mt-2 text-neutral-400">No portfolio data found. Try a different address.</p>
       </div>
     );
   }
 
   const totalValue = data.totalValueUsd;
   const totalVolume = data.totalVolume;
-  const topPositions = data.positions.slice(0, 10);
   const recentTrades = data.recentTrades.slice(0, 10);
 
   return (
@@ -78,7 +119,8 @@ export function Portfolio() {
         <StatCard
           icon={TrendingUp}
           label="Total Volume"
-          value={`${totalVolume.toFixed(4)} ETH`}
+          value={totalVolume.toFixed(4)}
+          sub="native tokens traded"
           accent="cyan"
         />
         <StatCard
@@ -104,14 +146,14 @@ export function Portfolio() {
             <h2 className="text-lg font-semibold font-display">Top Positions</h2>
             <span className="text-xs text-neutral-500">{data.positions.length} total</span>
           </div>
-          {topPositions.length === 0 ? (
+          {data.positions.length === 0 ? (
             <div className="card p-8 text-center text-sm text-neutral-500">
               No active positions. <Link to="/" className="text-moon-400 hover:underline">Start trading →</Link>
             </div>
           ) : (
             <div className="card-elevated overflow-hidden">
               <div className="divide-y divide-white/[0.04]">
-                {topPositions.map((p) => {
+                {(showAllPositions ? data.positions : data.positions.slice(0, 10)).map((p) => {
                   const meta = chainMeta[p.chainId];
                   return (
                     <Link
@@ -148,6 +190,14 @@ export function Portfolio() {
                   );
                 })}
               </div>
+              {data.positions.length > 10 && (
+                <button
+                  onClick={() => setShowAllPositions((v) => !v)}
+                  className="w-full border-t border-white/[0.04] py-2.5 text-xs font-medium text-moon-300 hover:bg-white/[0.02] transition-colors"
+                >
+                  {showAllPositions ? "Show less" : `Show all ${data.positions.length} positions`}
+                </button>
+              )}
             </div>
           )}
 
@@ -161,7 +211,9 @@ export function Portfolio() {
           ) : (
             <div className="card-elevated overflow-hidden">
               <div className="divide-y divide-white/[0.04]">
-                {recentTrades.map((t, i) => (
+                {recentTrades.map((t, i) => {
+                  const nativeSym = chainMeta[t.chainId]?.nativeSymbol ?? "ETH";
+                  return (
                   <div key={`${t.txHash}-${i}`} className="flex items-center gap-3 p-3 hover:bg-white/[0.02] transition-colors">
                     <div className={cn(
                       "flex h-8 w-8 items-center justify-center rounded-lg",
@@ -181,13 +233,14 @@ export function Portfolio() {
                     <div className="text-right">
                       <p className="text-xs font-medium tabular">
                         {Number(t.quoteAmount) / 1e18 < 0.001
-                          ? `${(Number(t.quoteAmount) / 1e18).toExponential(2)} ETH`
-                          : `${(Number(t.quoteAmount) / 1e18).toFixed(4)} ETH`}
+                          ? `${(Number(t.quoteAmount) / 1e18).toExponential(2)} ${nativeSym}`
+                          : `${(Number(t.quoteAmount) / 1e18).toFixed(4)} ${nativeSym}`}
                       </p>
                       <p className="text-[10px] text-neutral-500 tabular">@ ${t.priceUsd.toFixed(6)}</p>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -230,7 +283,7 @@ export function Portfolio() {
                         {t.graduated && <Flame className="h-3 w-3 text-moon-400 shrink-0" />}
                       </div>
                       <p className="text-[10px] text-neutral-500 tabular">
-                        Mkt {formatMarketCap(t.marketCapUsd)} · {t.holders} holders
+                        Mkt {formatMarketCap(t.marketCapUsd)} · {t.holderCount} holders
                       </p>
                     </div>
                     <ExternalLink className="h-3 w-3 text-neutral-600 group-hover:text-moon-300 transition-colors" />

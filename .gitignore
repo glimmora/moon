@@ -6,8 +6,13 @@
 
 # ─── Dependencies ────────────────────────────────────────
 node_modules/
+node_modules
 .pnp
 .pnp.js
+
+# Exclude npm/yarn lockfiles but commit pnpm-lock.yaml for reproducible builds
+package-lock.json
+yarn.lock
 
 # ─── Build artifacts ─────────────────────────────────────
 dist/
@@ -44,12 +49,5 @@ coverage/
 .next/
 *.pid
 .secrets/
-*.lock
-/contracts/lib/
-out/
-cache/
-broadcast/
-node_modules/
-.env
 skills/
 upload/

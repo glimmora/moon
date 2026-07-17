@@ -6,6 +6,7 @@ import { Trophy, Users, Coins, Flame, Crown, Medal, ArrowUpRight, Loader2 } from
 import { formatUsd, shortenAddress, formatMarketCap, timeAgo } from "@/lib/format";
 import { chainMeta } from "@/config/chains";
 import { cn } from "@/lib/cn";
+import { ErrorState } from "@/components/feedback/ErrorState";
 
 type Tab = "traders" | "creators" | "tokens";
 
@@ -52,13 +53,15 @@ export function Leaderboard() {
       </div>
 
       {/* Tab switcher */}
-      <div className="flex gap-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1 max-w-md mx-auto">
+      <div role="tablist" aria-label="Leaderboard category" className="flex gap-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1 max-w-md mx-auto">
         {tabs.map((t) => {
           const active = tab === t.key;
           const Icon = t.icon;
           return (
             <button
               key={t.key}
+              role="tab"
+              aria-selected={active}
               onClick={() => setTab(t.key)}
               className={cn(
                 "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all",
@@ -77,6 +80,9 @@ export function Leaderboard() {
       {tab === "traders" && (
         <LeaderboardTable
           loading={traders.isLoading}
+          isError={traders.isError}
+          error={traders.error}
+          onRetry={() => traders.refetch()}
           data={traders.data ?? []}
           columns={["Rank", "Trader", "Volume", "Trades"]}
           renderRow={(row) => (
@@ -89,6 +95,9 @@ export function Leaderboard() {
       {tab === "creators" && (
         <LeaderboardTable
           loading={creators.isLoading}
+          isError={creators.isError}
+          error={creators.error}
+          onRetry={() => creators.refetch()}
           data={creators.data ?? []}
           columns={["Rank", "Creator", "Tokens", "24h Volume", "Holders"]}
           renderRow={(row) => (
@@ -100,10 +109,12 @@ export function Leaderboard() {
       {/* Tokens */}
       {tab === "tokens" && (
         <>
-          <div className="flex justify-center gap-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1 max-w-sm mx-auto">
+          <div role="tablist" aria-label="Sort tokens by" className="flex justify-center gap-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1 max-w-sm mx-auto">
             {(["volume", "holders", "marketcap"] as const).map((s) => (
               <button
                 key={s}
+                role="tab"
+                aria-selected={tokenSort === s}
                 onClick={() => setTokenSort(s)}
                 className={cn(
                   "flex-1 rounded-lg py-1.5 text-xs font-medium capitalize transition-all",
@@ -114,20 +125,22 @@ export function Leaderboard() {
               </button>
             ))}
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(tokens.data ?? []).map((t) => (
-              <TokenRankCard key={`${t.chainId}-${t.address}`} token={t} />
-            ))}
-          </div>
-          {tokens.isLoading && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {tokens.isError ? (
+            <ErrorState error={tokens.error} title="Couldn't load top tokens" onRetry={() => tokens.refetch()} />
+          ) : tokens.isLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-label="Loading tokens">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="shimmer h-40" />
               ))}
             </div>
-          )}
-          {!tokens.isLoading && (tokens.data ?? []).length === 0 && (
+          ) : (tokens.data ?? []).length === 0 ? (
             <div className="card p-12 text-center text-sm text-neutral-500">No tokens yet.</div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {(tokens.data ?? []).map((t) => (
+                <TokenRankCard key={`${t.chainId}-${t.address}`} token={t} />
+              ))}
+            </div>
           )}
         </>
       )}
@@ -137,21 +150,30 @@ export function Leaderboard() {
 
 function LeaderboardTable<T>({
   loading,
+  isError,
+  error,
+  onRetry,
   data,
   columns,
   renderRow,
 }: {
   loading: boolean;
+  isError?: boolean;
+  error?: unknown;
+  onRetry?: () => void;
   data: T[];
   columns: string[];
   renderRow: (row: T) => React.ReactNode;
 }) {
   if (loading) {
     return (
-      <div className="card-elevated p-8 flex justify-center">
+      <div className="card-elevated p-8 flex justify-center" role="status" aria-label="Loading leaderboard">
         <Loader2 className="h-6 w-6 animate-spin text-moon-400" />
       </div>
     );
+  }
+  if (isError) {
+    return <ErrorState error={error} title="Couldn't load the leaderboard" onRetry={onRetry} />;
   }
   if (data.length === 0) {
     return <div className="card p-12 text-center text-sm text-neutral-500">No data yet.</div>;
@@ -163,7 +185,7 @@ function LeaderboardTable<T>({
           <thead className="bg-white/[0.02] text-xs text-neutral-500 uppercase tracking-wider">
             <tr>
               {columns.map((c, i) => (
-                <th key={c} className={cn("px-4 py-3 font-medium", i === 0 ? "text-left w-16" : i === 1 ? "text-left" : "text-right")}>
+                <th key={c} scope="col" className={cn("px-4 py-3 font-medium", i === 0 ? "text-left w-16" : i === 1 ? "text-left" : "text-right")}>
                   {c}
                 </th>
               ))}
@@ -181,7 +203,7 @@ function LeaderboardTable<T>({
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1) return <Crown className="h-4 w-4 text-amber-400" />;
   if (rank === 2) return <Medal className="h-4 w-4 text-neutral-300" />;
-  if (rank === 3) return <Medal className="h-4 w-4 text-amber-700" />;
+  if (rank === 3) return <Medal className="h-4 w-4 text-orange-400" />;
   return <span className="tabular text-neutral-500">{rank}</span>;
 }
 
@@ -216,7 +238,7 @@ function CreatorsRow({ row }: { row: { rank: number; address: string; tokensCrea
   );
 }
 
-function TokenRankCard({ token }: { token: { rank: number; chainId: number; address: string; name: string; symbol: string; imageUrl: string; priceUsd: number; marketCapUsd: number; holders: number; volume24h: number; graduated: boolean; createdAt: number } }) {
+function TokenRankCard({ token }: { token: { rank: number; chainId: number; address: string; name: string; symbol: string; imageUrl: string; priceUsd: number; marketCapUsd: number; holderCount: number; volume24h: number; graduated: boolean; createdAt: number } }) {
   const meta = chainMeta[token.chainId];
   return (
     <Link
@@ -263,7 +285,7 @@ function TokenRankCard({ token }: { token: { rank: number; chainId: number; addr
         </div>
         <div>
           <p className="text-neutral-500 text-[10px] uppercase">Holders</p>
-          <p className="font-semibold tabular">{token.holders.toLocaleString()}</p>
+          <p className="font-semibold tabular">{token.holderCount.toLocaleString()}</p>
         </div>
       </div>
     </Link>

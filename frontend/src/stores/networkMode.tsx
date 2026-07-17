@@ -14,18 +14,32 @@ const NetworkModeContext = createContext<NetworkModeContextValue | undefined>(un
 
 const STORAGE_KEY = "moon.fun.networkMode";
 
+function safeRead<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    return (window.localStorage.getItem(key) as T) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeWrite(key: string, value: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Private browsing or quota exceeded — silently ignore.
+  }
+}
+
 export function NetworkModeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<NetworkMode>(() => {
-    if (typeof window === "undefined") return "testnet"; // default to testnet (deployed there)
-    const saved = window.localStorage.getItem(STORAGE_KEY) as NetworkMode | null;
-    return saved ?? "testnet";
-  });
+  const [mode, setModeState] = useState<NetworkMode>(() =>
+    safeRead<NetworkMode>(STORAGE_KEY, "testnet"),
+  );
 
   const setMode = (m: NetworkMode) => {
     setModeState(m);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, m);
-    }
+    safeWrite(STORAGE_KEY, m);
   };
 
   const toggle = () => setMode(mode === "mainnet" ? "testnet" : "mainnet");
@@ -48,6 +62,7 @@ export function NetworkModeProvider({ children }: { children: ReactNode }) {
   return <NetworkModeContext.Provider value={value}>{children}</NetworkModeContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useNetworkMode(): NetworkModeContextValue {
   const ctx = useContext(NetworkModeContext);
   if (!ctx) throw new Error("useNetworkMode must be used within NetworkModeProvider");

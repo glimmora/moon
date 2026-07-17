@@ -44,11 +44,23 @@ export const creatorFeeVaultAbi = [
   },
   {
     type: "event",
-    name: "FeesClaimed",
+    name: "FeesAccrued",
     inputs: [
+      { name: "token", type: "address", indexed: true },
       { name: "creator", type: "address", indexed: true },
       { name: "quoteAsset", type: "address", indexed: false },
       { name: "amount", type: "uint256", indexed: false },
     ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "FeesClaimed",
+    inputs: [
+      { name: "creator", type: "address", indexed: true },
+      { name: "quoteAsset", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+    anonymous: false,
   },
 ] as const;

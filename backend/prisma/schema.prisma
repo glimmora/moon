@@ -1,9 +1,6 @@
 // moon.fun backend Prisma schema.
-// Database: PostgreSQL 16 (production).
-//
-// For local dev without Postgres, `./scripts/dev.sh` will auto-swap the
-// provider to 'sqlite' via sed before running prisma generate/push, then
-// restore it afterwards. Don't use env() for provider — Prisma doesn't allow it.
+// Database: PostgreSQL 16 (the only supported provider).
+// For local dev, start the bundled Postgres with `docker compose up -d db`.
 
 generator client {
   provider = "prisma-client-js"
@@ -43,9 +40,13 @@ model Token {
 
   @@unique([chainId, address])
   @@index([chainId])
+  @@index([chainId, curve])
   @@index([createdAt])
   @@index([graduated])
   @@index([volume24h])
+  @@index([holderCount])
+  @@index([marketCapUsd])
+  @@index([creator])
 }
 
 /// A single buy/sell/graduate event on a bonding curve.
@@ -68,7 +69,9 @@ model Trade {
 
   @@unique([chainId, txHash, tokenAddress])
   @@index([chainId, tokenAddress, timestamp])
+  @@index([chainId, timestamp])
   @@index([trader])
+  @@index([trader, timestamp])
 }
 
 /// A token holder snapshot (periodically refreshed by the holder listener).

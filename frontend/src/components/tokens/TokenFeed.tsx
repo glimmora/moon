@@ -3,10 +3,10 @@ import { TokenCard } from "./TokenCard";
 import { useNetworkMode } from "@/stores/networkMode";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
 import { useMemo, useState } from "react";
-import { Flame, Clock, TrendingUp, Crown, WifiOff } from "lucide-react";
+import { Flame, Clock, TrendingUp, Crown, WifiOff, Rocket } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Link } from "react-router-dom";
-import { formatMarketCap, formatPercent, shortenAddress } from "@/lib/format";
+import { formatMarketCap, shortenAddress } from "@/lib/format";
 import { chainMeta } from "@/config/chains";
 
 type Sort = "trending" | "new" | "graduated";
@@ -69,7 +69,7 @@ export function TokenFeed() {
               </div>
               <p className="mt-1 text-sm text-neutral-400">
                 by <span className="font-mono">{shortenAddress(spotlight.creator)}</span> ·{" "}
-                {spotlight.holders.toLocaleString()} holders
+                {spotlight.holderCount.toLocaleString()} holders
               </p>
               <div className="mt-2 flex items-center gap-4 text-sm">
                 <div>
@@ -80,9 +80,8 @@ export function TokenFeed() {
                   <span className="text-neutral-500 text-xs">Price </span>
                   <span className="font-semibold tabular">${spotlight.priceUsd.toFixed(6)}</span>
                 </div>
-                <div className="text-emerald-400 font-semibold flex items-center gap-0.5">
-                  <TrendingUp className="h-3 w-3" />
-                  <span className="tabular">{formatPercent(12.4)}</span>
+                <div className="text-neutral-400 font-semibold flex items-center gap-0.5">
+                  <span className="tabular text-xs">Vol ${spotlight.volume24h.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -161,6 +160,4 @@ export function TokenFeed() {
   );
 }
 
-function Rocket(props: React.ComponentProps<typeof Flame>) {
-  return <Flame {...props} />;
-}
+

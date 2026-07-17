@@ -17,7 +17,8 @@ export function useWalletEvents() {
   const chainId = useChainId();
   const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const { mode } = useNetworkMode();
-  const toast = useToast();
+  // Destructure stable function references to avoid infinite effect loops.
+  const { success: toastSuccess, error: toastError, info: toastInfo, loading: toastLoading, dismiss: toastDismiss } = useToast();
 
   // Track previous values to detect changes (not first-render)
   const prevAddress = useRef<string | undefined>(undefined);
@@ -31,11 +32,11 @@ export function useWalletEvents() {
 
     // Connect
     if (!prevConnected.current && isConnected && address) {
-      toast.success("Wallet connected", `${address.slice(0, 6)}…${address.slice(-4)}`);
+      toastSuccess("Wallet connected", `${address.slice(0, 6)}…${address.slice(-4)}`);
     }
     // Disconnect
     if (prevConnected.current && !isConnected) {
-      toast.info("Wallet disconnected");
+      toastInfo("Wallet disconnected");
     }
     // Account changed (same connection, different address)
     if (
@@ -45,12 +46,12 @@ export function useWalletEvents() {
       address &&
       prevAddress.current.toLowerCase() !== address.toLowerCase()
     ) {
-      toast.info("Account changed", `${address.slice(0, 6)}…${address.slice(-4)}`);
+      toastInfo("Account changed", `${address.slice(0, 6)}…${address.slice(-4)}`);
     }
 
     prevConnected.current = isConnected;
     prevAddress.current = address;
-  }, [isConnected, address, isReconnecting, toast]);
+  }, [isConnected, address, isReconnecting, toastSuccess, toastInfo]);
 
   // Chain change events
   useEffect(() => {
@@ -63,15 +64,15 @@ export function useWalletEvents() {
       const newChain = chainById(chainId);
       const oldName = oldChain?.name ?? `Chain #${prevChainId.current}`;
       const newName = newChain?.name ?? `Chain #${chainId}`;
-      toast.info("Network changed", `${oldName} → ${newName}`);
+      toastInfo("Network changed", `${oldName} → ${newName}`);
       prevChainId.current = chainId;
     }
-  }, [chainId, toast]);
+  }, [chainId, toastInfo]);
 
   // Network mode toggle events
   useEffect(() => {
     if (prevMode.current !== mode) {
-      toast.info(
+      toastInfo(
         mode === "testnet" ? "Switched to Testnet" : "Switched to Mainnet",
         mode === "testnet"
           ? "Tokens here have NO real value"
@@ -85,29 +86,31 @@ export function useWalletEvents() {
         if (!activeChainIds.includes(chainId)) {
           const targetId = activeChainIds[0];
           const targetChain = chainById(targetId);
-          toast.loading(
+          toastInfo(
             "Wrong network",
             `Please switch to ${targetChain?.name ?? "a supported chain"}`,
           );
         }
       }
     }
-  }, [mode, isConnected, chainId, toast]);
+  }, [mode, isConnected, chainId, toastInfo]);
 
   // Auto-switch helper (call from components)
   const ensureChain = async (targetChainId: number): Promise<boolean> => {
     if (chainId === targetChainId) return true;
     if (!isConnected) {
-      toast.error("Wallet not connected", "Please connect your wallet first");
+      toastError("Wallet not connected", "Please connect your wallet first");
       return false;
     }
+    const loadingId = toastLoading("Switching network…", `Target: ${chainById(targetChainId)?.name ?? "#" + targetChainId}`);
     try {
-      toast.loading("Switching network…", `Target: ${chainById(targetChainId)?.name ?? "#" + targetChainId}`);
       await switchChainAsync({ chainId: targetChainId });
-      toast.success("Network switched", chainById(targetChainId)?.name ?? `Chain #${targetChainId}`);
+      toastDismiss(loadingId);
+      toastSuccess("Network switched", chainById(targetChainId)?.name ?? `Chain #${targetChainId}`);
       return true;
     } catch (e) {
-      toast.error("Failed to switch network", e instanceof Error ? e.message : "Unknown error");
+      toastDismiss(loadingId);
+      toastError("Failed to switch network", e instanceof Error ? e.message : "Unknown error");
       return false;
     }
   };

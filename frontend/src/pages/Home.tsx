@@ -1,8 +1,19 @@
 import { Link } from "react-router-dom";
 import { Rocket, TrendingUp, Shield, Zap, Flame, ArrowRight, Sparkles } from "lucide-react";
 import { TokenFeed } from "@/components/tokens/TokenFeed";
+import { useTokens } from "@/hooks/useTokens";
+import { chainMeta } from "@/config/chains";
+import { formatUsd } from "@/lib/format";
 
 export function Home() {
+  const { data: tokens, isLoading } = useTokens();
+
+  // Live protocol stats derived from the indexed token list.
+  const chainCount = Object.keys(chainMeta).length;
+  const tokenCount = tokens?.length ?? 0;
+  const volume24h = (tokens ?? []).reduce((sum, t) => sum + (t.volume24h ?? 0), 0);
+  const graduatedCount = (tokens ?? []).filter((t) => t.graduated).length;
+
   return (
     <div className="space-y-12 py-6 animate-fade-in-up">
       {/* Hero */}
@@ -31,12 +42,17 @@ export function Home() {
           </Link>
         </div>
 
-        {/* Stats strip */}
-        <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto">
-          <StatPill value="7" label="Chains" />
-          <StatPill value="3" label="Curve Shapes" />
-          <StatPill value="1.25%" label="Final Fee" />
-          <StatPill value="Burned" label="LP Burn" />
+        {/* Live protocol stats */}
+        <div
+          className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto"
+          role="status"
+          aria-live="polite"
+          aria-busy={isLoading}
+        >
+          <StatPill value={isLoading ? "…" : tokenCount.toLocaleString()} label="Tokens" />
+          <StatPill value={isLoading ? "…" : formatUsd(volume24h)} label="24h Volume" />
+          <StatPill value={isLoading ? "…" : graduatedCount.toLocaleString()} label="Graduated" />
+          <StatPill value={String(chainCount)} label="Chains" />
         </div>
       </section>
 

@@ -30,6 +30,8 @@ interface IFeeRouter {
     /// @dev AUDIT-FIX L-2: emitted when a native push to the original recipient failed
     ///      and funds were routed to treasury instead.
     event PushFallback(address indexed originalRecipient, address indexed treasury, uint256 amount);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
+    event Rescued(address indexed token, address indexed to, uint256 amount);
 
     /* ─────────────────────────  Core  ─────────────────────────── */
 
@@ -54,4 +56,6 @@ interface IFeeRouter {
     function setMoonBurner(address moonBurner_) external;
     function grantCallerRole(address curve) external;
     function revokeCallerRole(address curve) external;
+    function setTreasury(address treasury_) external;
+    function rescue(address token, address to, uint256 amount) external;
 }

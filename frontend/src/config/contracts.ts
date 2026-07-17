@@ -20,7 +20,10 @@ const env = import.meta.env;
 
 function addr(key: string): Address {
   const v = env[key] as string | undefined;
-  if (!v) return "0x0000000000000000000000000000000000000000";
+  if (!v) {
+    console.warn(`[contracts] Missing env var ${key} — using zero address`);
+    return "0x0000000000000000000000000000000000000000";
+  }
   return v as Address;
 }
 

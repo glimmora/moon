@@ -2,6 +2,7 @@ import { useBubblemap, type BubblemapNode } from "@/hooks/useHolders";
 import { useMemo } from "react";
 import { shortenAddress } from "@/lib/format";
 import { CircleDot } from "lucide-react";
+import { ErrorState } from "@/components/feedback/ErrorState";
 
 interface BubblemapProps {
   chainId: number;
@@ -14,7 +15,7 @@ interface BubblemapProps {
  * holders) are drawn as faint lines.
  */
 export function Bubblemap({ chainId, tokenAddress }: BubblemapProps) {
-  const { data, isLoading } = useBubblemap(chainId, tokenAddress);
+  const { data, isLoading, isError, error, refetch } = useBubblemap(chainId, tokenAddress);
 
   const layout = useMemo(() => {
     if (!data || data.length === 0) return { nodes: [], links: [] };
@@ -42,7 +43,11 @@ export function Bubblemap({ chainId, tokenAddress }: BubblemapProps) {
   }, [data]);
 
   if (isLoading) {
-    return <div className="card h-80 animate-pulse" />;
+    return <div className="card h-80 animate-pulse" role="status" aria-label="Loading holder bubblemap" />;
+  }
+
+  if (isError) {
+    return <ErrorState error={error} title="Couldn't load bubblemap" onRetry={() => refetch()} />;
   }
 
   if (!data || data.length === 0) {
@@ -57,7 +62,16 @@ export function Bubblemap({ chainId, tokenAddress }: BubblemapProps) {
   return (
     <div className="card p-4">
       <h3 className="mb-3 font-semibold">Holder Bubblemap</h3>
-      <svg viewBox="0 0 500 500" className="h-80 w-full" role="img" aria-label="Holder bubblemap">
+      <svg
+        viewBox="0 0 500 500"
+        className="h-80 w-full"
+        role="img"
+        aria-labelledby="bubblemap-title bubblemap-desc"
+      >
+        <title id="bubblemap-title">Holder bubblemap</title>
+        <desc id="bubblemap-desc">
+          {`Distribution of ${data.length} holders. Bubble size is proportional to share of supply; blue bubbles are contracts, magenta bubbles are wallets.`}
+        </desc>
         {/* Connections */}
         {layout.links.map((l, i) => (
           <line
@@ -108,6 +122,26 @@ export function Bubblemap({ chainId, tokenAddress }: BubblemapProps) {
           <span className="h-2 w-2 rounded-full bg-blue-500" /> Contract
         </span>
       </div>
+      {/* Accessible fallback: the SVG conveys no data to screen readers, so mirror it as a table. */}
+      <table className="sr-only">
+        <caption>Holder distribution</caption>
+        <thead>
+          <tr>
+            <th scope="col">Address</th>
+            <th scope="col">Share of supply</th>
+            <th scope="col">Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((n) => (
+            <tr key={n.address}>
+              <td>{shortenAddress(n.address, 3)}</td>
+              <td>{n.percentage.toFixed(2)}%</td>
+              <td>{n.isContract ? "Contract" : "Wallet"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

@@ -29,6 +29,11 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
     uint8 private s_supplyTier;
     uint8 private s_curveShape;
 
+    /// @dev Actual name/symbol for cloned tokens (OZ v5 ERC20 stores these as immutables,
+    ///      which clones can't override — we store them here and override name()/symbol()).
+    string private s_name;
+    string private s_symbol;
+
     uint256 private s_maxTxBps; // 0..500 (5%)
     uint256 private s_maxHoldBps; // 0..1000 (10%)
     uint256 private s_cooldownSeconds; // 0..3600
@@ -54,7 +59,11 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
     /* ───────────────────────  Constructor  ────────────────────── */
 
     /// @dev Implementation constructor — name/symbol are placeholders; real values set in initialize().
-    constructor() ERC20("Moon Token", "MOON") {}
+    ///      AUDIT-FIX M3: mark the implementation itself as initialized so it can never be
+    ///      initialized directly. Only fresh clones (whose storage starts zeroed) are usable.
+    constructor() ERC20("Moon Token", "MOON") {
+        s_initialized = true;
+    }
 
     /* ───────────────────────  Init  ───────────────────────────── */
 
@@ -78,10 +87,16 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
         s_maxTxBps = params.maxTxBps;
         s_maxHoldBps = params.maxHoldBps;
         s_cooldownSeconds = params.cooldownSeconds;
+        s_name = params.name;
+        s_symbol = params.symbol;
 
         s_totalSupplyInit = _supplyForTier(params.supplyTier);
 
         // The factory is the minter and is exempt from limits.
+        // AUDIT-FIX M1: also grant the factory DEFAULT_ADMIN_ROLE so a compromised curve
+        // that holds MINTER_ROLE can be revoked by the factory admin. Without an admin,
+        // MINTER_ROLE would be irrevocable and a compromised curve could mint forever.
+        _grantRole(DEFAULT_ADMIN_ROLE, factory);
         _grantRole(MINTER_ROLE, factory);
         s_exempt[factory] = true;
         s_exempt[DEAD] = true;
@@ -134,22 +149,22 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
     /// @dev Hooks into transfers to enforce max-tx / max-hold / cooldown.
     ///      `nonReentrant` guards against callback-based reentry.
     function _update(address from, address to, uint256 amount) internal override nonReentrant {
-        bool fromExempt = s_exempt[from];
-        bool toExempt = s_exempt[to];
+        // AUDIT-FIX (curve buy DoS): mints (from == 0) and burns (to == 0) are the bonding
+        // curve's buy/sell flows. They must NOT be blocked by max-tx or cooldown — otherwise
+        // any buy that mints more than maxTxBps of the supply reverts, DoS-ing buys. The curve
+        // itself is exempt, so a mint originating from it is treated as exempt on the `from`
+        // side. Max-hold is still enforced on the recipient of a mint to cap accumulation.
+        bool isMint = from == address(0);
+        bool isBurn = to == address(0);
+        bool fromExempt = s_exempt[from] || isMint;
+        bool toExempt = s_exempt[to] || isBurn;
 
         if (!fromExempt && !toExempt) {
-            // Max-tx applies to non-exempt transfers.
+            // Max-tx applies to non-exempt peer-to-peer transfers.
             if (s_maxTxBps != 0 && amount > (s_totalSupplyInit * s_maxTxBps) / 10_000) {
                 revert ExceedsMaxTx();
             }
-            // Max-hold applies to the recipient.
-            if (s_maxHoldBps != 0 && to != address(0) && to != DEAD) {
-                uint256 newBal = balanceOf(to) + amount;
-                if (newBal > (s_totalSupplyInit * s_maxHoldBps) / 10_000) {
-                    revert ExceedsMaxHold();
-                }
-            }
-            // Cooldown (timestamp-based anti-sandwich).
+            // Cooldown (timestamp-based anti-sandwich) — peer-to-peer only.
             // AUDIT-FIX M-2: Removed the `last != 0` bypass — the first-ever trade was
             // silently allowed through even if a cooldown should have applied. Now the
             // check is simply: if `last` is set AND we're still inside the cooldown window,
@@ -160,6 +175,15 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
                     revert CooldownActive();
                 }
                 s_lastTradeBlock[from] = block.timestamp;
+            }
+        }
+
+        // Max-hold applies to any non-exempt recipient (including buyers receiving a mint),
+        // but never to burns (to == 0) or the DEAD address.
+        if (!toExempt && s_maxHoldBps != 0 && to != DEAD) {
+            uint256 newBal = balanceOf(to) + amount;
+            if (newBal > (s_totalSupplyInit * s_maxHoldBps) / 10_000) {
+                revert ExceedsMaxHold();
             }
         }
 
@@ -181,6 +205,7 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
     ///      burnFrom (on sell).
     function grantMinterRole(address account) external override onlyRole(MINTER_ROLE) {
         _grantRole(MINTER_ROLE, account);
+        emit MinterRoleGranted(account);
     }
 
     /* ───────────────────────  Getters  ────────────────────────── */
@@ -217,6 +242,14 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
         return s_exempt[account];
     }
 
+    function name() public view override returns (string memory) {
+        return bytes(s_name).length > 0 ? s_name : super.name();
+    }
+
+    function symbol() public view override returns (string memory) {
+        return bytes(s_symbol).length > 0 ? s_symbol : super.symbol();
+    }
+
     /* ───────────────────────  Internal helpers  ───────────────── */
 
     /// @dev Supply validation: only 1B / 10B / 100B tiers are allowed.
@@ -231,7 +264,7 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override (AccessControl)
+        override(AccessControl)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);

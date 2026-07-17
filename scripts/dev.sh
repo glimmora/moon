@@ -10,8 +10,8 @@
 #   Frontend: 5173 (Vite dev server)
 #   Backend:  4000 (Express + Socket.io)
 #
-# Requires: node, npm, npx. Backend additionally needs a Postgres DATABASE_URL
-# (defaults to sqlite file if Postgres is unavailable — see backend/.env).
+# Requires: node, pnpm, npx. Backend needs a running Postgres (DATABASE_URL);
+# start the bundled one with `docker compose up -d db`.
 
 set -uo pipefail
 
@@ -64,10 +64,10 @@ start_frontend() {
   log "Starting frontend (port $FRONTEND_PORT)…"
   cd "$FRONTEND_DIR"
 
-  # Install deps if missing
+  # Install deps if missing (workspace-aware — installs all packages via pnpm).
   if [ ! -d "node_modules" ]; then
-    warn "frontend node_modules not found — installing…"
-    npm install --legacy-peer-deps > "$LOG_DIR/frontend-install.log" 2>&1
+    warn "frontend node_modules not found — installing workspace deps…"
+    (cd "$ROOT" && pnpm install > "$LOG_DIR/frontend-install.log" 2>&1)
   fi
 
   # Ensure .env exists
@@ -90,30 +90,27 @@ start_backend() {
   log "Starting backend (port $BACKEND_PORT)…"
   cd "$BACKEND_DIR"
 
-  # Install deps if missing
+  # Install deps if missing (workspace-aware — installs all packages via pnpm).
   if [ ! -d "node_modules" ]; then
-    warn "backend node_modules not found — installing…"
-    npm install > "$LOG_DIR/backend-install.log" 2>&1
+    warn "backend node_modules not found — installing workspace deps…"
+    (cd "$ROOT" && pnpm install > "$LOG_DIR/backend-install.log" 2>&1)
   fi
 
-  # Ensure .env exists — detect Postgres or fall back to sqlite
+  # Ensure .env exists — Postgres only (start one via `docker compose up -d db`).
   if [ ! -f ".env" ]; then
-    # Check if Postgres is reachable on localhost:5432
-    if command -v pg_isready >/dev/null 2>&1 && pg_isready -h localhost -p 5432 -q 2>/dev/null; then
-      info "Postgres detected on localhost:5432 — using postgresql provider"
-      cat > .env <<'EOF'
+    info "Creating backend/.env (Postgres)…"
+    cat > .env <<'EOF'
 BACKEND_PORT=4000
 NODE_ENV=development
 CORS_ORIGIN=http://localhost:5173
-DATABASE_PROVIDER=postgresql
 DATABASE_URL=postgresql://moon:moon@localhost:5432/moonfun
-JWT_SECRET=dev-secret-change-me
+JWT_SECRET=dev-secret-change-me-to-a-32-char-minimum-value
 BSC_RPC_URL=https://bsc-dataseed.binance.org
 BASE_RPC_URL=https://mainnet.base.org
 ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
 BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
 BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
-ARBITRUM_SEPOLIA_RPC_URL=https://sepolia-arbitrum.api.onrender.com
+ARBITRUM_SEPOLIA_RPC_URL=https://arbitrum-sepolia-rpc.publicnode.com
 ETHEREUM_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 POLL_INTERVAL_MS=4000
 START_BLOCK_OFFSET=10000
@@ -122,95 +119,48 @@ FACTORY_ETHEREUM_SEPOLIA=0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3
 TREASURY_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
 DEV_WALLET_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
 EOF
-    else
-      warn "Postgres not detected — using sqlite fallback (file:./dev.db)"
-      cat > .env <<'EOF'
-BACKEND_PORT=4000
-NODE_ENV=development
-CORS_ORIGIN=http://localhost:5173
-DATABASE_PROVIDER=sqlite
-DATABASE_URL=file:./dev.db
-JWT_SECRET=dev-secret-change-me
-BSC_RPC_URL=https://bsc-dataseed.binance.org
-BASE_RPC_URL=https://mainnet.base.org
-ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
-BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
-BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
-ARBITRUM_SEPOLIA_RPC_URL=https://sepolia-arbitrum.api.onrender.com
-ETHEREUM_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
-POLL_INTERVAL_MS=4000
-START_BLOCK_OFFSET=10000
-MAX_BLOCK_BATCH=500
-FACTORY_ETHEREUM_SEPOLIA=0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3
-TREASURY_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
-DEV_WALLET_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
-EOF
-    fi
   fi
 
-  # Show which DB provider is configured
+  # Show DB URL
   if [ -f ".env" ]; then
-    local provider=$(grep -E "^DATABASE_PROVIDER=" .env | cut -d= -f2 || echo "postgresql")
     local dburl=$(grep -E "^DATABASE_URL=" .env | cut -d= -f2- || echo "?")
-    info "Database provider: $provider"
     info "Database URL: $dburl"
   fi
 
-  # Generate Prisma client + push schema
+  # Generate Prisma client + push schema (Postgres only).
   if [ -f "prisma/schema.prisma" ]; then
-    # Read DB provider from .env
-    local db_provider=$(grep -E "^DATABASE_PROVIDER=" .env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]' || echo "postgresql")
     local db_url=$(grep -E "^DATABASE_URL=" .env 2>/dev/null | cut -d= -f2- | tr -d '[:space:]')
 
-    # If sqlite, sed-swap the provider in schema.prisma (Prisma doesn't allow env() for provider)
-    if [ "$db_provider" = "sqlite" ]; then
-      info "Swapping schema.prisma provider to sqlite…"
-      sed -i.bak 's/provider = "postgresql"/provider = "sqlite"/' prisma/schema.prisma
-    fi
+    info "Testing Postgres connection…"
+    local pg_user=$(echo "$db_url" | sed -n 's|postgresql://\([^:]*\):.*|\1|p')
+    local pg_pass=$(echo "$db_url" | sed -n 's|postgresql://[^:]*:\([^@]*\)@.*|\1|p')
+    local pg_host=$(echo "$db_url" | sed -n 's|.*@\([^:]*\):.*|\1|p')
+    local pg_port=$(echo "$db_url" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
+    local pg_db=$(echo "$db_url" | sed -n 's|.*/\([^?]*\).*|\1|p')
 
-    # Test Postgres connectivity before pushing schema
-    if [ "$db_provider" = "postgresql" ]; then
-      info "Testing Postgres connection…"
-      local pg_user=$(echo "$db_url" | sed -n 's|postgresql://\([^:]*\):.*|\1|p')
-      local pg_pass=$(echo "$db_url" | sed -n 's|postgresql://[^:]*:\([^@]*\)@.*|\1|p')
-      local pg_host=$(echo "$db_url" | sed -n 's|.*@\([^:]*\):.*|\1|p')
-      local pg_port=$(echo "$db_url" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
-      local pg_db=$(echo "$db_url" | sed -n 's|.*/\([^?]*\).*|\1|p')
-
-      if command -v psql >/dev/null 2>&1; then
-        PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" -c "SELECT 1;" > /dev/null 2>&1
-        if [ $? -ne 0 ]; then
-          err "Cannot connect to Postgres at $pg_host:$pg_port/$pg_db as user '$pg_user'"
-          echo ""
-          echo "${YELLOW}Common fixes:${NC}"
-          echo "  1. Create user + database:"
-          echo "     sudo -u postgres psql -c \"CREATE USER moon WITH PASSWORD 'moon';\""
-          echo "     sudo -u postgres psql -c \"CREATE DATABASE moonfun OWNER moon;\""
-          echo "     sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE moonfun TO moon;\""
-          echo ""
-          echo "  2. Fix pg_hba.conf auth method (change 'peer' to 'md5'):"
-          echo "     sudo sed -i 's/peer/md5/g' /etc/postgresql/*/main/pg_hba.conf"
-          echo "     sudo systemctl restart postgresql"
-          echo ""
-          echo "  3. Or fall back to SQLite (no Postgres needed):"
-          echo "     Edit backend/.env:"
-          echo "       DATABASE_PROVIDER=sqlite"
-          echo "       DATABASE_URL=file:./dev.db"
-          echo ""
-          exit 1
-        fi
-        info "Postgres connection OK"
-      else
-        warn "psql not installed — skipping connection test"
+    if command -v psql >/dev/null 2>&1; then
+      PGPASSWORD="$pg_pass" psql -h "$pg_host" -p "$pg_port" -U "$pg_user" -d "$pg_db" -c "SELECT 1;" > /dev/null 2>&1
+      if [ $? -ne 0 ]; then
+        err "Cannot connect to Postgres at $pg_host:$pg_port/$pg_db as user '$pg_user'"
+        echo ""
+        echo "${YELLOW}Quickest fix — start the bundled Postgres via Docker:${NC}"
+        echo "     docker compose up -d db"
+        echo ""
+        echo "${YELLOW}Or create the user + database manually:${NC}"
+        echo "     sudo -u postgres psql -c \"CREATE USER moon WITH PASSWORD 'moon';\""
+        echo "     sudo -u postgres psql -c \"CREATE DATABASE moonfun OWNER moon;\""
+        echo ""
+        exit 1
       fi
+      info "Postgres connection OK"
+    else
+      warn "psql not installed — skipping connection test"
     fi
 
     info "Generating Prisma client…"
     npx prisma generate > "$LOG_DIR/prisma.log" 2>&1 || {
       err "prisma generate failed:"
       cat "$LOG_DIR/prisma.log"
-      # Restore schema if we swapped it
-      [ -f "prisma/schema.prisma.bak" ] && mv prisma/schema.prisma.bak prisma/schema.prisma
       exit 1
     }
 
@@ -222,17 +172,9 @@ EOF
       cat "$LOG_DIR/prisma.log"
       echo ""
       echo "${YELLOW}Full log: $LOG_DIR/prisma.log${NC}"
-      # Restore schema if we swapped it
-      [ -f "prisma/schema.prisma.bak" ] && mv prisma/schema.prisma.bak prisma/schema.prisma
       exit 1
     fi
     info "Schema pushed successfully"
-
-    # Restore schema.prisma if we swapped it for sqlite
-    if [ "$db_provider" = "sqlite" ] && [ -f "prisma/schema.prisma.bak" ]; then
-      mv prisma/schema.prisma.bak prisma/schema.prisma
-      info "Restored schema.prisma to postgresql"
-    fi
   fi
 
   nohup ./node_modules/.bin/tsx watch src/index.ts \

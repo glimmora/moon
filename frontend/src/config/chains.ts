@@ -1,10 +1,12 @@
-import { type Chain } from "wagmi/chains";
+import { type Chain as WagmiChain } from "wagmi/chains";
 
 /**
  * Chain metadata for moon.fun. We define our own chain objects (rather than importing
  * from wagmi/chains) so we can attach the moon.fun-specific `chainMeta` (block explorer,
  * native symbol, RPC from env, etc.) and keep testnet/mainnet parity.
  */
+
+type Chain = WagmiChain & { testnet?: boolean };
 
 export type NetworkMode = "mainnet" | "testnet";
 
@@ -18,18 +20,33 @@ export interface ChainMeta {
   isTestnet: boolean;
 }
 
+// Build an RPC list: a user-provided env RPC (if any) first, then several public
+// fallbacks. The wagmi transport wraps these in `fallback()` so a single flaky
+// endpoint can't take the app down.
+function rpcs(env: string | undefined, ...fallbacks: string[]): [string, ...string[]] {
+  const list = [env, ...fallbacks].filter((u): u is string => Boolean(u));
+  return (list.length ? list : fallbacks) as [string, ...string[]];
+}
+
 const BSC = {
   id: 56,
   name: "BNB Smart Chain",
   nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
   rpcUrls: {
-    default: { http: [import.meta.env.VITE_RPC_BSC || "https://bsc-dataseed.binance.org"] },
+    default: {
+      http: rpcs(
+        import.meta.env.VITE_RPC_BSC,
+        "https://bsc-dataseed.binance.org",
+        "https://bsc-dataseed1.defibit.io",
+        "https://rpc.ankr.com/bsc",
+      ),
+    },
   },
   blockExplorers: {
     default: { name: "BscScan", url: "https://bscscan.com" },
   },
   testnet: false,
-} as const;
+} satisfies Chain;
 
 const BSC_TESTNET = {
   id: 97,
@@ -37,45 +54,70 @@ const BSC_TESTNET = {
   nativeCurrency: { name: "BNB", symbol: "tBNB", decimals: 18 },
   rpcUrls: {
     default: {
-      http: [import.meta.env.VITE_RPC_BSC_TESTNET || "https://data-seed-prebsc-1-s1.binance.org:8545"],
+      http: rpcs(
+        import.meta.env.VITE_RPC_BSC_TESTNET,
+        "https://data-seed-prebsc-1-s1.binance.org:8545",
+        "https://data-seed-prebsc-2-s1.binance.org:8545",
+        "https://bsc-testnet.public.blastapi.io",
+      ),
     },
   },
   blockExplorers: { default: { name: "BscScan", url: "https://testnet.bscscan.com" } },
   testnet: true,
-} as const;
+} satisfies Chain;
 
 const BASE = {
   id: 8453,
   name: "Base",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: [import.meta.env.VITE_RPC_BASE || "https://mainnet.base.org"] },
+    default: {
+      http: rpcs(
+        import.meta.env.VITE_RPC_BASE,
+        "https://mainnet.base.org",
+        "https://base.llamarpc.com",
+        "https://base.publicnode.com",
+      ),
+    },
   },
   blockExplorers: { default: { name: "Basescan", url: "https://basescan.org" } },
   testnet: false,
-} as const;
+} satisfies Chain;
 
 const BASE_SEPOLIA = {
   id: 84532,
   name: "Base Sepolia",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: [import.meta.env.VITE_RPC_BASE_SEPOLIA || "https://sepolia.base.org"] },
+    default: {
+      http: rpcs(
+        import.meta.env.VITE_RPC_BASE_SEPOLIA,
+        "https://sepolia.base.org",
+        "https://base-sepolia.publicnode.com",
+      ),
+    },
   },
   blockExplorers: { default: { name: "Basescan", url: "https://sepolia.basescan.org" } },
   testnet: true,
-} as const;
+} satisfies Chain;
 
 const ARBITRUM = {
   id: 42161,
   name: "Arbitrum One",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: [import.meta.env.VITE_RPC_ARBITRUM || "https://arb1.arbitrum.io/rpc"] },
+    default: {
+      http: rpcs(
+        import.meta.env.VITE_RPC_ARBITRUM,
+        "https://arb1.arbitrum.io/rpc",
+        "https://arbitrum.llamarpc.com",
+        "https://arbitrum-one.publicnode.com",
+      ),
+    },
   },
   blockExplorers: { default: { name: "Arbiscan", url: "https://arbiscan.io" } },
   testnet: false,
-} as const;
+} satisfies Chain;
 
 const ARBITRUM_SEPOLIA = {
   id: 421614,
@@ -83,23 +125,34 @@ const ARBITRUM_SEPOLIA = {
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
     default: {
-      http: [import.meta.env.VITE_RPC_ARBITRUM_SEPOLIA || "https://sepolia-arbitrum.api.onrender.com"],
+      http: rpcs(
+        import.meta.env.VITE_RPC_ARBITRUM_SEPOLIA,
+        "https://sepolia-rollup.arbitrum.io/rpc",
+        "https://arbitrum-sepolia.publicnode.com",
+      ),
     },
   },
   blockExplorers: { default: { name: "Arbiscan", url: "https://sepolia.arbiscan.io" } },
   testnet: true,
-} as const;
+} satisfies Chain;
 
 const ETHEREUM_SEPOLIA = {
   id: 11155111,
   name: "Ethereum Sepolia",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: [import.meta.env.VITE_RPC_ETHEREUM_SEPOLIA || "https://rpc.sepolia.org"] },
+    default: {
+      http: rpcs(
+        import.meta.env.VITE_RPC_ETHEREUM_SEPOLIA,
+        "https://ethereum-sepolia-rpc.publicnode.com",
+        "https://rpc.sepolia.org",
+        "https://sepolia.gateway.tenderly.co",
+      ),
+    },
   },
   blockExplorers: { default: { name: "Etherscan", url: "https://sepolia.etherscan.io" } },
   testnet: true,
-} as const;
+} satisfies Chain;
 
 export const chainMeta: Record<number, ChainMeta> = {
   56: {
@@ -161,7 +214,7 @@ export const chainMeta: Record<number, ChainMeta> = {
   },
 };
 
-export const moonChains = [
+export const moonChains: Chain[] = [
   BSC,
   BASE,
   ARBITRUM,
@@ -169,7 +222,7 @@ export const moonChains = [
   BASE_SEPOLIA,
   ARBITRUM_SEPOLIA,
   ETHEREUM_SEPOLIA,
-] as unknown as Chain[];
+];
 
 export const MAINNET_CHAIN_IDS = [56, 8453, 42161];
 export const TESTNET_CHAIN_IDS = [97, 84532, 421614, 11155111];

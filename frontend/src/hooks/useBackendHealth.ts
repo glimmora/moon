@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { API_BASE } from "@/services/api";
 
 export interface BackendHealth {
   status: "online" | "offline";
@@ -15,7 +16,7 @@ export function useBackendHealth() {
   const query = useQuery({
     queryKey: ["backend-health"],
     queryFn: async (): Promise<BackendHealth> => {
-      const BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+      const BASE = API_BASE;
       const start = performance.now();
       try {
         // Try /api/health first, then /health

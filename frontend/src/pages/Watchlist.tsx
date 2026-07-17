@@ -2,10 +2,12 @@ import { useWatchlist, useTokens } from "@/hooks/useTokens";
 import { TokenCard } from "@/components/tokens/TokenCard";
 import { Star, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Skeleton } from "@/components/feedback/Skeleton";
+import { ErrorState } from "@/components/feedback/ErrorState";
 
 export function Watchlist() {
   const { data: watched } = useWatchlist();
-  const { data: tokens } = useTokens();
+  const { data: tokens, isLoading, isError, error, refetch } = useTokens();
 
   const list = (tokens ?? []).filter((t) => (watched ?? []).includes(`${t.chainId}-${t.address}`));
 
@@ -17,11 +19,22 @@ export function Watchlist() {
         </div>
         <div>
           <h1 className="text-2xl font-bold font-display">Watchlist</h1>
-          <p className="text-xs text-neutral-500">{list.length} token{list.length === 1 ? "" : "s"} starred</p>
+          <p className="text-xs text-neutral-500">
+            {isLoading ? "Loading…" : `${list.length} token${list.length === 1 ? "" : "s"} starred`}
+          </p>
         </div>
       </div>
 
-      {list.length === 0 ? (
+      {isLoading ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-label="Loading watchlist">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-56" />
+          ))}
+          <span className="sr-only">Loading watchlist…</span>
+        </div>
+      ) : isError ? (
+        <ErrorState error={error} title="Couldn't load your watchlist" onRetry={() => refetch()} />
+      ) : list.length === 0 ? (
         <div className="card p-12 text-center">
           <Star className="mx-auto mb-3 h-10 w-10 text-neutral-600" />
           <p className="text-sm text-neutral-400">No tokens in your watchlist yet.</p>

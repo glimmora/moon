@@ -77,6 +77,10 @@ contract SepoliaIntegrationTest is Test {
         registry.grantRole(registry.DEFAULT_ADMIN_ROLE(), address(factory));
         feeRouter.grantRole(feeRouter.DEFAULT_ADMIN_ROLE(), address(factory));
 
+        // AUDIT-FIX C1: grant the FeeRouter CALLER_ROLE on the MoonBurner so buyback+burn
+        // succeeds (mirrors Deploy.s.sol).
+        moonBurner.grantRole(moonBurner.CALLER_ROLE(), address(feeRouter));
+
         vm.stopPrank();
     }
 

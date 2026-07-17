@@ -2,4 +2,3 @@ packages:
   - "contracts"
   - "frontend"
   - "backend"
-  - "docs"

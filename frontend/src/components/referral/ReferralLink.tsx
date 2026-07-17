@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { Copy, Check, Share2, UserPlus } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useToast } from "@/stores/toast";
 
 /**
  * Referral link component. Generates a moon.fun referral URL tied to the connected
@@ -11,29 +12,64 @@ import { cn } from "@/lib/cn";
  */
 export function ReferralLink() {
   const { address } = useAccount();
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    return () => { if (copyTimer.current) clearTimeout(copyTimer.current); };
+  }, []);
 
   const link = address
     ? `${window.location.origin}/?ref=${address}`
     : "Connect wallet to generate your referral link.";
 
-  async function copy() {
+  function markCopied() {
+    setCopied(true);
+    toast.success("Referral link copied");
+    copyTimer.current = setTimeout(() => setCopied(false), 2000);
+  }
+
+  function copy() {
     if (!address) return;
     try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      navigator.clipboard.writeText(link).then(markCopied).catch(fallbackCopy);
     } catch {
-      // Fallback for non-secure contexts.
+      fallbackCopy();
+    }
+  }
+
+  function fallbackCopy() {
+    // Fallback for non-secure contexts / clipboard permission denial.
+    try {
       const ta = document.createElement("textarea");
       ta.value = link;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
       document.body.removeChild(ta);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      markCopied();
+    } catch {
+      toast.error("Couldn't copy — copy the link manually.");
     }
+  }
+
+  async function share() {
+    if (!address) return;
+    // Prefer the native share sheet on supported devices; fall back to Twitter.
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "moon.fun", text: "Launch your meme token on moon.fun 🌙", url: link });
+        return;
+      } catch {
+        return; // user cancelled — no error toast
+      }
+    }
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent("Launch your meme token on moon.fun 🌙")}&url=${encodeURIComponent(link)}`,
+      "_blank",
+      "noreferrer",
+    );
   }
 
   return (
@@ -65,16 +101,14 @@ export function ReferralLink() {
       </div>
 
       <div className="flex gap-2">
-        <a
-          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-            "Launch your meme token on moon.fun 🌙",
-          )}&url=${encodeURIComponent(link)}`}
-          target="_blank"
-          rel="noreferrer"
-          className="btn-outline flex-1 text-xs"
+        <button
+          type="button"
+          onClick={share}
+          disabled={!address}
+          className={cn("btn-outline flex-1 text-xs", !address && "opacity-50")}
         >
           <Share2 className="h-3.5 w-3.5" /> Share
-        </a>
+        </button>
       </div>
 
       {!address && (

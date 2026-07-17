@@ -12,12 +12,28 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "moon.fun.theme";
 
+function safeRead<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    return (window.localStorage.getItem(key) as T) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeWrite(key: string, value: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Private browsing or quota exceeded — silently ignore.
+  }
+}
+
 function getInitialTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-  const saved = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
+  const saved = safeRead<string>(STORAGE_KEY, "");
   if (saved === "dark" || saved === "light") return saved;
-  // System preference
-  if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
+  if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
   return "dark";
 }
 
@@ -26,9 +42,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = (t: Theme) => {
     setThemeState(t);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, t);
-    }
+    safeWrite(STORAGE_KEY, t);
   };
 
   const toggle = () => setTheme(theme === "dark" ? "light" : "dark");
@@ -50,7 +64,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const handler = (e: MediaQueryListEvent) => {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
+      const saved = safeRead<string>(STORAGE_KEY, "");
       if (!saved) {
         setThemeState(e.matches ? "dark" : "light");
       }
@@ -66,6 +80,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error("useTheme must be used within ThemeProvider");

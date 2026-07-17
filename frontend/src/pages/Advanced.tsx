@@ -5,12 +5,13 @@ import { TokenCard } from "@/components/tokens/TokenCard";
 import { chainMeta } from "@/config/chains";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { ErrorState } from "@/components/feedback/ErrorState";
 
 const TIERS = ["All", "1B", "10B", "100B"] as const;
 const CURVES = ["All", "Linear", "Exponential", "Logarithmic"] as const;
 
 export function Advanced() {
-  const { data, isLoading } = useTokens();
+  const { data, isLoading, isError, error, refetch } = useTokens();
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") ?? "";
   const [query, setQuery] = useState(initialQuery);
@@ -24,8 +25,15 @@ export function Advanced() {
 
   const filtered = useMemo(() => {
     if (!data) return [];
+    const q = query.trim().toLowerCase();
     return data.filter((t) => {
-      if (query && !t.name.toLowerCase().includes(query.toLowerCase()) && !t.symbol.toLowerCase().includes(query.toLowerCase()))
+      // Match name, symbol, or contract address (address search now works as advertised).
+      if (
+        q &&
+        !t.name.toLowerCase().includes(q) &&
+        !t.symbol.toLowerCase().includes(q) &&
+        !t.address.toLowerCase().includes(q)
+      )
         return false;
       if (tier !== "All" && t.supplyTier !== TIERS.indexOf(tier) - 1) return false;
       if (curve !== "All" && t.curveShape !== CURVES.indexOf(curve) - 1) return false;
@@ -42,7 +50,9 @@ export function Advanced() {
         </div>
         <div>
           <h1 className="text-2xl font-bold font-display">Advanced Explorer</h1>
-          <p className="text-xs text-neutral-500">{filtered.length} token{filtered.length === 1 ? "" : "s"} match</p>
+          <p className="text-xs text-neutral-500" aria-live="polite">
+            {isLoading ? "Loading…" : `${filtered.length} token${filtered.length === 1 ? "" : "s"} match`}
+          </p>
         </div>
       </div>
 
@@ -54,11 +64,13 @@ export function Advanced() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name, symbol, or address…"
+            aria-label="Search tokens by name, symbol, or address"
             className="input pl-10 pr-10"
           />
           {query && (
             <button
               onClick={() => setQuery("")}
+              aria-label="Clear search"
               className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
             >
               <X className="h-4 w-4" />
@@ -87,11 +99,13 @@ export function Advanced() {
 
       {/* Results */}
       {isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="status" aria-label="Loading tokens">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="shimmer h-52" />
           ))}
         </div>
+      ) : isError ? (
+        <ErrorState error={error} title="Couldn't load tokens" onRetry={() => refetch()} />
       ) : filtered.length === 0 ? (
         <div className="card p-12 text-center">
           <Search className="mx-auto mb-3 h-10 w-10 text-neutral-600" />
@@ -113,11 +127,13 @@ export function Advanced() {
 function FilterGroup({ label, options, value, onChange }: { label: string; options: string[]; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs text-neutral-400 font-medium">{label}</label>
-      <div className="flex flex-wrap gap-1.5">
+      <span className="mb-1.5 block text-xs text-neutral-400 font-medium" id={`filter-${label}`}>{label}</span>
+      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-labelledby={`filter-${label}`}>
         {options.map((o) => (
           <button
             key={o}
+            role="radio"
+            aria-checked={value === o}
             onClick={() => onChange(o)}
             className={cn(
               "rounded-lg px-3 py-1.5 text-xs font-medium transition-all",

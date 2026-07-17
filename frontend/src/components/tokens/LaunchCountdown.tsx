@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useState } from "react";
 import { Rocket, TrendingUp, Timer } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { GRADUATION_THRESHOLDS } from "@/lib/curve";
 
 interface LaunchCountdownProps {
   /** Current progress 0..100 (volume / threshold * 100). */
@@ -11,6 +12,8 @@ interface LaunchCountdownProps {
   createdAt?: number;
   /** Optional current volume (24h). */
   volume24h?: number;
+  /** Supply tier (0=1B, 1=10B, 2=100B) — used to determine graduation threshold. */
+  supplyTier?: number;
   /** Compact mode (used inside cards). */
   compact?: boolean;
 }
@@ -25,13 +28,14 @@ export function LaunchCountdown({
   graduated,
   createdAt,
   volume24h,
+  supplyTier,
   compact,
 }: LaunchCountdownProps) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     if (graduated || !createdAt) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(id);
   }, [graduated, createdAt]);
 
@@ -42,11 +46,12 @@ export function LaunchCountdown({
     const elapsedSec = Math.max(1, (now - createdAt) / 1000);
     const volPerSec = volume24h / elapsedSec;
     const remaining = Math.max(0, 100 - progress);
-    // remaining% of threshold (assume ~50 ETH threshold for 1B tier)
-    const remainingVol = (remaining / 100) * 50;
+    // Tier-dependent graduation threshold (ETH): 0→50, 1→500, 2→5000
+    const threshold = GRADUATION_THRESHOLDS[supplyTier ?? 0] ?? 50;
+    const remainingVol = (remaining / 100) * threshold;
     const secLeft = volPerSec > 0 ? remainingVol / volPerSec : Infinity;
     return { eta: secLeft };
-  }, [graduated, createdAt, volume24h, progress, now]);
+  }, [graduated, createdAt, volume24h, progress, supplyTier, now]);
 
   if (graduated) {
     return (
@@ -81,7 +86,14 @@ export function LaunchCountdown({
           </span>
         </div>
       </div>
-      <div className="progress-track">
+      <div
+        className="progress-track"
+        role="progressbar"
+        aria-label="Graduation progress"
+        aria-valuenow={Math.round(pct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
         <div
           className={cn(
             "progress-fill",

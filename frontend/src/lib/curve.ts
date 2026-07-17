@@ -9,6 +9,9 @@ export enum CurveShape {
   LOGARITHMIC = 2,
 }
 
+/** Graduation threshold in ETH per supply tier (0=1B, 1=10B, 2=100B). */
+export const GRADUATION_THRESHOLDS = [50, 500, 5000] as const;
+
 export const START_PRICE = 270_000_000n;
 export const END_PRICE = 270_000_000_000n;
 export const BASE_REAL_TOKEN_PER_1B = 793_100_000n * 10n ** 18n;

@@ -8,14 +8,11 @@ const schema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
 
-  // DATABASE_URL can be either a postgres URL (postgresql://…) or a sqlite
-  // file path (file:./dev.db). Don't use z.string().url() — it rejects the
-  // sqlite form.
+  // Postgres connection string (postgresql://…). Postgres is the only supported
+  // provider; use docker-compose (see repo root) for a local instance.
   DATABASE_URL: z.string().min(1),
-  DATABASE_PROVIDER: z.enum(["postgresql", "sqlite"]).default("postgresql"),
-  REDIS_URL: z.string().url().optional(),
 
-  JWT_SECRET: z.string().min(8).default("dev-secret"),
+  JWT_SECRET: z.string().min(32),
 
   // RPC URLs — all optional with defaults so the backend can start even
   // if some chains are not configured.
@@ -45,6 +42,16 @@ const schema = z.object({
   POLL_INTERVAL_MS: z.coerce.number().default(4000),
   START_BLOCK_OFFSET: z.coerce.number().default(10000),
   MAX_BLOCK_BATCH: z.coerce.number().default(500),
+  // Number of block confirmations to lag behind chain head. Events within this
+  // window may still be reorged out, so we never index blocks newer than
+  // (head - CONFIRMATIONS). Reorgs shallower than this are absorbed transparently.
+  CONFIRMATIONS: z.coerce.number().default(12),
+  // On each poll we re-scan the last N confirmed blocks to heal shallow reorgs
+  // (upserts are idempotent). Must be <= CONFIRMATIONS to stay in the safe zone.
+  REORG_REWIND_BLOCKS: z.coerce.number().default(12),
+}).refine((e) => e.REORG_REWIND_BLOCKS <= e.CONFIRMATIONS, {
+  message: "REORG_REWIND_BLOCKS must be <= CONFIRMATIONS (else the rewind scans into the unsafe reorg window)",
+  path: ["REORG_REWIND_BLOCKS"],
 });
 
 const parsed = schema.safeParse(process.env);

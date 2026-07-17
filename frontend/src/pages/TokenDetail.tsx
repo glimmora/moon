@@ -6,36 +6,71 @@ import { PriceChart } from "@/components/chart/PriceChart";
 import { HolderTable } from "@/components/holders/HolderTable";
 import { Bubblemap } from "@/components/holders/Bubblemap";
 import { chainMeta } from "@/config/chains";
-import { formatMarketCap, shortenAddress, timeAgo, formatToken } from "@/lib/format";
-import { ArrowLeft, ExternalLink, Flame, Loader2, LineChart, Users, Share2 } from "lucide-react";
+import { formatMarketCap, shortenAddress, timeAgo, formatToken, graduationProgress } from "@/lib/format";
+import { ArrowLeft, ExternalLink, Flame, Loader2, LineChart, Users, Share2, SearchX } from "lucide-react";
 import { Link } from "react-router-dom";
-import { type Address } from "viem";
+import { isAddress, type Address } from "viem";
 import { cn } from "@/lib/cn";
 import { LaunchCountdown } from "@/components/tokens/LaunchCountdown";
+import { ErrorState } from "@/components/feedback/ErrorState";
+import { EmptyState } from "@/components/feedback/EmptyState";
+import { addressUrl, tokenUrl } from "@/lib/explorer";
 
 export function TokenDetail() {
   const params = useParams<{ chainId: string; address: string }>();
   const chainId = Number(params.chainId);
-  const tokenAddress = params.address as Address;
+  const addressValid = isAddress(params.address ?? "");
+  const tokenAddress = (addressValid ? params.address : "0x0000000000000000000000000000000000000000") as Address;
   const { meta, curveState } = useTokenDetail(chainId, tokenAddress);
   const [tab, setTab] = useState<"chart" | "holders" | "bubblemap">("chart");
 
   const meta_ = chainMeta[chainId];
   const data = meta.data;
 
+  // Malformed URL — the address isn't a valid contract address.
+  if (!addressValid || Number.isNaN(chainId)) {
+    return (
+      <div className="py-16">
+        <EmptyState
+          icon={SearchX}
+          title="Invalid token link"
+          description="This address or network isn't valid. Double-check the link and try again."
+          action={<Link to="/" className="btn-primary inline-flex">Back to explore</Link>}
+        />
+      </div>
+    );
+  }
+
   if (meta.isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
+      <div className="flex h-64 items-center justify-center" role="status" aria-label="Loading token">
         <Loader2 className="h-8 w-8 animate-spin text-moon-400" />
+      </div>
+    );
+  }
+
+  // Distinguish a real fetch failure (retryable) from a token that doesn't exist.
+  if (meta.isError) {
+    return (
+      <div className="py-16">
+        <ErrorState
+          error={meta.error}
+          title="Couldn't load this token"
+          onRetry={() => meta.refetch()}
+        />
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="py-24 text-center">
-        <p className="text-neutral-500">Token not found.</p>
-        <Link to="/" className="btn-primary mt-4 inline-flex">Back to explore</Link>
+      <div className="py-16">
+        <EmptyState
+          icon={SearchX}
+          title="Token not found"
+          description="We couldn't find a token at this address on this network. It may not exist or hasn't been indexed yet."
+          action={<Link to="/" className="btn-primary inline-flex">Back to explore</Link>}
+        />
       </div>
     );
   }
@@ -81,28 +116,28 @@ export function TokenDetail() {
             </div>
             <p className="mt-1.5 text-sm text-neutral-500 flex flex-wrap items-center gap-1.5">
               <span>Creator</span>
-              <a href={`${meta_?.explorer}/address/${data.creator}`} target="_blank" rel="noreferrer" className="font-mono text-moon-400 hover:underline">
+              <a href={addressUrl(chainId, data.creator)} target="_blank" rel="noreferrer" className="font-mono text-moon-400 hover:underline">
                 {shortenAddress(data.creator)}
               </a>
               <span className="text-neutral-700">·</span>
               <span>{timeAgo(data.createdAt)}</span>
               <span className="text-neutral-700">·</span>
-              <span className="tabular">{data.holders.toLocaleString()} holders</span>
+              <span className="tabular">{data.holderCount.toLocaleString()} holders</span>
             </p>
             {data.description && (
               <p className="mt-3 text-sm text-neutral-400 leading-relaxed max-w-2xl">{data.description}</p>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
-              <a href={`${meta_?.explorer}/address/${tokenAddress}`} target="_blank" rel="noreferrer" className="btn-ghost text-xs !py-1.5">
+              <a href={tokenUrl(chainId, tokenAddress)} target="_blank" rel="noreferrer" className="btn-ghost text-xs !py-1.5">
                 <ExternalLink className="h-3 w-3" /> Token
               </a>
               {data.curve && (
-                <a href={`${meta_?.explorer}/address/${data.curve}`} target="_blank" rel="noreferrer" className="btn-ghost text-xs !py-1.5">
+                <a href={addressUrl(chainId, data.curve)} target="_blank" rel="noreferrer" className="btn-ghost text-xs !py-1.5">
                   <ExternalLink className="h-3 w-3" /> Curve
                 </a>
               )}
               {data.dexPair && (
-                <a href={`${meta_?.explorer}/address/${data.dexPair}`} target="_blank" rel="noreferrer" className="btn-ghost text-xs !py-1.5">
+                <a href={addressUrl(chainId, data.dexPair)} target="_blank" rel="noreferrer" className="btn-ghost text-xs !py-1.5">
                   <ExternalLink className="h-3 w-3" /> DEX Pair
                 </a>
               )}
@@ -126,10 +161,11 @@ export function TokenDetail() {
             <div className="flex-1">
               <p className="text-xs uppercase tracking-wider text-neutral-500 mb-2">Graduation Progress</p>
               <LaunchCountdown
-                progress={Math.min(100, Math.max(2, (data.volume24h / 50) * 100))}
+                progress={graduationProgress(data.volume24h, data.supplyTier)}
                 graduated={data.graduated}
                 createdAt={data.createdAt}
                 volume24h={data.volume24h}
+                supplyTier={data.supplyTier}
               />
             </div>
             <div className="hidden sm:block w-px h-12 bg-white/[0.08]" />
@@ -149,13 +185,18 @@ export function TokenDetail() {
         {/* Left: chart + tabs */}
         <div className="lg:col-span-2 space-y-4">
           {/* Tab switcher */}
-          <div className="flex gap-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1">
+          <div role="tablist" aria-label="Token views" className="flex gap-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1">
             {tabs.map((t) => {
               const active = tab === t.key;
               const Icon = t.icon;
               return (
                 <button
                   key={t.key}
+                  role="tab"
+                  id={`tab-${t.key}`}
+                  aria-selected={active}
+                  aria-controls={`tabpanel-${t.key}`}
+                  tabIndex={active ? 0 : -1}
                   onClick={() => setTab(t.key)}
                   className={cn(
                     "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all",
@@ -169,9 +210,11 @@ export function TokenDetail() {
             })}
           </div>
 
-          {tab === "chart" && <PriceChart chainId={chainId} tokenAddress={tokenAddress} />}
-          {tab === "holders" && <HolderTable chainId={chainId} tokenAddress={tokenAddress} />}
-          {tab === "bubblemap" && <Bubblemap chainId={chainId} tokenAddress={tokenAddress} />}
+          <div role="tabpanel" id={`tabpanel-${tab}`} aria-labelledby={`tab-${tab}`}>
+            {tab === "chart" && <PriceChart chainId={chainId} tokenAddress={tokenAddress} />}
+            {tab === "holders" && <HolderTable chainId={chainId} tokenAddress={tokenAddress} />}
+            {tab === "bubblemap" && <Bubblemap chainId={chainId} tokenAddress={tokenAddress} />}
+          </div>
         </div>
 
         {/* Right: trade panel */}

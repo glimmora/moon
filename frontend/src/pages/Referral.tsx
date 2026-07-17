@@ -8,7 +8,7 @@ import { formatUsd, shortenAddress } from "@/lib/format";
 export function Referral() {
   const { address } = useAccount();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["referral-stats", address],
     queryFn: () => (address ? api.getReferralStats(address) : Promise.resolve(null)),
     enabled: Boolean(address),
@@ -27,8 +27,17 @@ export function Referral() {
 
       <ReferralLink />
 
-      {address && (
-        <div className="grid gap-3 sm:grid-cols-3">
+      {address && isError && (
+        <div className="card border-red-500/20 bg-red-500/[0.06] p-4 text-center text-sm text-red-300" role="alert">
+          Couldn't load your referral stats.{" "}
+          <button onClick={() => refetch()} className="font-medium underline hover:text-red-200">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {address && !isError && (
+        <div className="grid gap-3 sm:grid-cols-3" aria-live="polite" aria-busy={isLoading}>
           <StatCard
             icon={Users}
             label="Referrals"

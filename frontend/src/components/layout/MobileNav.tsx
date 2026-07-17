@@ -14,7 +14,7 @@ export function MobileNav() {
   const { pathname } = useLocation();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 safe-x safe-bottom px-3 pb-3 pt-2 pointer-events-none">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 safe-x safe-bottom px-3 pb-3 pt-2 pointer-events-none" aria-label="Primary">
       <div className="mx-auto max-w-md pointer-events-auto">
         <div className="glass rounded-2xl shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.6)]">
           <ul className="grid grid-cols-5 h-14">
@@ -25,6 +25,8 @@ export function MobileNav() {
                 <li key={item.to}>
                   <Link
                     to={item.to}
+                    aria-current={active ? "page" : undefined}
+                    aria-label={item.label}
                     className={cn(
                       "flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-all duration-250 ease-smooth",
                       active ? "text-moon-400" : "text-neutral-500 hover:text-neutral-300",

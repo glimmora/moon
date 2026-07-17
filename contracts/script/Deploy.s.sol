@@ -40,11 +40,12 @@ abstract contract DeployScript is Script {
         address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
         address treasury = vm.envAddress("TREASURY_ADDRESS");
         address devWallet = vm.envAddress("DEV_WALLET_ADDRESS");
-        // MoonBurner requires a non-zero moonToken address. Use treasury as
-        // placeholder — can be updated later via MoonBurner admin (currently
-        // MoonBurner has no setter for moonToken, so this is permanent for now).
+        // MoonBurner requires a non-zero moonToken address. Use treasury as a
+        // placeholder — it can be updated later via MoonBurner.setMoonToken (admin only).
         // In production, deploy the $MOON governance token first and pass its address.
         address moonTokenGov = vm.envOr("MOON_TOKEN", treasury);
+        // AUDIT-FIX H1: optional Uniswap V2 router for graduation LP seeding (0 = disabled).
+        address dexRouter = vm.envOr("DEX_ROUTER", address(0));
 
         vm.startBroadcast(deployer);
 
@@ -78,6 +79,21 @@ abstract contract DeployScript is Script {
         CreatorFeeVault(payable(d.creatorFeeVault)).grantRole(bytes32(0x00), d.factory);
         ReferralRegistry(payable(d.referralRegistry)).grantRole(bytes32(0x00), d.factory);
         FeeRouter(payable(d.feeRouter)).grantRole(bytes32(0x00), d.factory);
+
+        // AUDIT-FIX C1: Grant the FeeRouter CALLER_ROLE on the MoonBurner so its
+        // buybackAndBurn calls succeed. Without this, the 30% burn share is transferred
+        // to the MoonBurner but buybackAndBurn always reverts (caught by try/catch),
+        // permanently stranding those funds.
+        MoonBurner(payable(d.moonBurner)).grantRole(
+            MoonBurner(payable(d.moonBurner)).CALLER_ROLE(), d.feeRouter
+        );
+
+        // AUDIT-FIX H1: configure the DEX router (used by both graduation LP seeding and
+        // MoonBurner buyback swaps) when provided via env.
+        if (dexRouter != address(0)) {
+            MoonFactory(d.factory).setDexRouter(dexRouter);
+            MoonBurner(payable(d.moonBurner)).setDexRouter(dexRouter);
+        }
 
         vm.stopBroadcast();
 

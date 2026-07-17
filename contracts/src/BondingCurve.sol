@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {IMoonToken} from "src/interfaces/IMoonToken.sol";
 import {IBondingCurve} from "src/interfaces/IBondingCurve.sol";
@@ -51,8 +50,8 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
     uint256 private constant BASE_FEE = 0.0125e18; // 1.25%
 
     /// @dev Creator + referral share of the fee (each), 1e18 fixed point.
-    uint256 private constant CREATOR_FEE_SHARE = 0.20e18; // 20% of fee → creator
-    uint256 private constant REFERRAL_FEE_SHARE = 0.10e18; // 10% of fee → referrer
+    uint256 private constant CREATOR_FEE_SHARE = 0.2e18; // 20% of fee → creator
+    uint256 private constant REFERRAL_FEE_SHARE = 0.1e18; // 10% of fee → referrer
 
     /// @dev Burn-it-all address.
     address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
@@ -89,6 +88,14 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
     /// @dev Creator of this token (for fee accrual).
     address private s_creator;
 
+    /* ───────────────────────  Constructor  ────────────────────── */
+
+    /// @dev AUDIT-FIX M3: mark the implementation as initialized so it can never be
+    ///      bootstrapped/initialized directly. Only fresh clones (zeroed storage) are usable.
+    constructor() {
+        s_initialized = true;
+    }
+
     /* ───────────────────────  Init (factory-only)  ────────────── */
 
     /// @notice One-shot factory bootstrap. Called by the MoonFactory immediately after
@@ -97,6 +104,9 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
     ///         become the factory on the very first call.
     /// @dev Can only be called once. Reverts if already set.
     function setFactory() external {
+        // AUDIT-FIX M3: the implementation is constructed with s_initialized = true, so it
+        // can never have its factory set; only fresh clones (zeroed storage) pass this.
+        if (s_initialized) revert AlreadyInitialized();
         if (s_factory != address(0)) revert AlreadyInitialized();
         // The factory is the deployer of the implementation, but clones are
         // deployed by the factory too. We trust msg.sender on this one-shot call.
@@ -170,17 +180,34 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
 
         uint256 fee;
         (tokensOut, fee) = _getBuyOut(quoteAmountIn);
-        if (tokensOut < minTokensOut) revert InsufficientQuote();
+
+        // AUDIT-FIX H-3 (supply cap + non-empty LP): never mint past the graduation threshold.
+        // Clamping tokensOut so s_realTokenReserves can reach — but not exceed — s_realReservesInit
+        // guarantees reservedForLP = totalSupplyInit - realReservesInit > 0 at graduation, and
+        // caps total minted supply below s_totalSupplyInit.
+        uint256 remaining =
+            s_realReservesInit > s_realTokenReserves ? s_realReservesInit - s_realTokenReserves : 0;
+        if (remaining == 0) revert AlreadyGraduated();
+        if (tokensOut > remaining) {
+            tokensOut = remaining;
+        }
+        if (tokensOut < minTokensOut) revert SlippageExceeded();
 
         // AUDIT-FIX CRITICAL: `fee` returned by _getBuyOut is a FRACTION (1e18-based, e.g. 0.99e18 = 99%),
         // NOT an absolute amount. Compute the absolute fee amount here.
         uint256 feeAmount = (quoteAmountIn * fee) / 1e18;
+        uint256 quoteAfterFee = quoteAmountIn - feeAmount;
 
         // ── Effects ──────────────────────────────────────────────
         s_realTokenReserves += tokensOut;
         // AUDIT-FIX H-2: Add quoteAfterFee (not quoteAmountIn) to reserves.
         // Fee is sent out via _distributeFee, so only the after-fee portion stays in the curve.
-        s_realQuoteReserves += (quoteAmountIn - feeAmount);
+        s_realQuoteReserves += quoteAfterFee;
+        // AUDIT-FIX CRITICAL (curve): move the virtual reserves along the constant-product
+        // curve so the price actually rises with each buy and buy/sell remain exact inverses.
+        // Previously the virtual reserves were static → flat price + LOG round-trip arbitrage.
+        s_virtualQuoteReserves += quoteAfterFee;
+        s_virtualTokenReserves -= tokensOut;
 
         // ── Interactions ─────────────────────────────────────────
         // 1) Mint tokens to the buyer (Option B).
@@ -189,7 +216,7 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         // 2) Distribute fees (all wrapped in try/catch internally).
         // AUDIT-FIX CRITICAL: pass feeAmount (absolute), not fee (fraction).
         if (feeAmount > 0) {
-            _distributeFee(feeAmount, referrer);
+            _distributeFee(feeAmount, quoteAmountIn, referrer);
         }
 
         // Check graduation threshold.
@@ -217,7 +244,7 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
 
         (uint256 grossQuoteOut, uint256 fee, uint256 netQuoteOut) = _getSellOut(tokenAmountIn);
         quoteOut = netQuoteOut;
-        if (quoteOut < minQuoteOut) revert InsufficientTokens();
+        if (quoteOut < minQuoteOut) revert SlippageExceeded();
 
         // AUDIT-FIX CRITICAL: `fee` is a FRACTION (1e18-based). Compute absolute fee amount.
         // The fee is taken from the GROSS quote out (before net deduction).
@@ -225,12 +252,15 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
 
         // ── Effects ──────────────────────────────────────────────
         // Decrement by GROSS quote out (pre-fee), per audited spec.
-        s_realTokenReserves = s_realTokenReserves > tokenAmountIn
-            ? s_realTokenReserves - tokenAmountIn
-            : 0;
-        s_realQuoteReserves = s_realQuoteReserves > grossQuoteOut
-            ? s_realQuoteReserves - grossQuoteOut
-            : 0;
+        s_realTokenReserves =
+            s_realTokenReserves > tokenAmountIn ? s_realTokenReserves - tokenAmountIn : 0;
+        s_realQuoteReserves =
+            s_realQuoteReserves > grossQuoteOut ? s_realQuoteReserves - grossQuoteOut : 0;
+        // AUDIT-FIX CRITICAL (curve): move the virtual reserves back along the constant-product
+        // curve — the exact inverse of a buy. Tokens return to the curve, quote leaves it.
+        s_virtualTokenReserves += tokenAmountIn;
+        s_virtualQuoteReserves =
+            s_virtualQuoteReserves > grossQuoteOut ? s_virtualQuoteReserves - grossQuoteOut : 0;
 
         // ── Interactions ─────────────────────────────────────────
         // 1) Send quote to seller.
@@ -245,7 +275,7 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         // AUDIT-FIX H-1: Forward referrer to _distributeFee (was hardcoded address(0))
         // AUDIT-FIX CRITICAL: pass feeAmount (absolute), not fee (fraction).
         if (feeAmount > 0) {
-            _distributeFee(feeAmount, referrer);
+            _distributeFee(feeAmount, grossQuoteOut, referrer);
         }
 
         // 3) Burn seller tokens LAST (CEI).
@@ -272,9 +302,8 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
 
         // Reserved tokens to mint for LP = totalSupplyInit - currentMinted.
         // currentMinted = s_realTokenReserves (everything minted so far lives in buyer wallets).
-        uint256 reservedForLP = s_totalSupplyInit > s_realTokenReserves
-            ? s_totalSupplyInit - s_realTokenReserves
-            : 0;
+        uint256 reservedForLP =
+            s_totalSupplyInit > s_realTokenReserves ? s_totalSupplyInit - s_realTokenReserves : 0;
 
         // Mint reserved tokens to this curve for LP provisioning.
         if (reservedForLP > 0) {
@@ -287,23 +316,27 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
 
         if (router != address(0)) {
             // Create the pair if it doesn't exist.
-            try IUniswapV2Factory(IUniswapV2Router02(router).factory()).createPair(s_token, s_quoteAsset)
-            returns (address p) {
+            try IUniswapV2Factory(IUniswapV2Router02(router).factory())
+                .createPair(s_token, s_quoteAsset) returns (
+                address p
+            ) {
                 pair = p;
             } catch {
-                pair = IUniswapV2Factory(IUniswapV2Router02(router).factory()).getPair(s_token, s_quoteAsset);
+                pair = IUniswapV2Factory(IUniswapV2Router02(router).factory())
+                    .getPair(s_token, s_quoteAsset);
             }
             s_dexPair = pair;
 
             if (pair != address(0)) {
                 // Approve tokens.
-                IMoonToken(s_token).approve(router, reservedForLP);
+                IERC20(address(s_token)).forceApprove(router, reservedForLP);
                 if (s_quoteAsset != address(0)) {
-                    IERC20(s_quoteAsset).approve(router, s_realQuoteReserves);
+                    IERC20(s_quoteAsset).forceApprove(router, s_realQuoteReserves);
                 }
 
                 // Wrap addLiquidity in try/catch — failure is non-fatal.
-                try IUniswapV2Router02(router).addLiquidity{value: s_quoteAsset == address(0) ? s_realQuoteReserves : 0}(
+                try IUniswapV2Router02(router)
+                .addLiquidity{value: s_quoteAsset == address(0) ? s_realQuoteReserves : 0}(
                     s_token,
                     s_quoteAsset,
                     reservedForLP,
@@ -312,11 +345,19 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
                     0,
                     address(this),
                     block.timestamp + 300
-                ) returns (uint256, uint256, uint256 lpAmount) {
+                ) returns (
+                    uint256, uint256, uint256 lpAmount
+                ) {
                     if (lpAmount > 0 && pair != address(0)) {
-                        // Burn LP to 0xdEaD.
-                        IUniswapV2Pair(pair).transfer(DEAD, lpAmount);
-                        emit Graduated(s_token, pair, lpAmount, reservedForLP, s_realQuoteReserves);
+                        // Burn LP to 0xdEaD — check return value to confirm the burn succeeded.
+                        bool burned = IUniswapV2Pair(pair).transfer(DEAD, lpAmount);
+                        if (burned) {
+                            emit Graduated(
+                                s_token, pair, lpAmount, reservedForLP, s_realQuoteReserves
+                            );
+                        } else {
+                            emit Graduated(s_token, pair, 0, reservedForLP, s_realQuoteReserves);
+                        }
                     }
                 } catch {
                     // DEX addLiquidity failed — emit graduation without LP.
@@ -335,7 +376,7 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
     /// @dev Distribute `feeAmount` of the quote asset across creator vault, referral registry,
     ///      and fee router. ALL three external calls are wrapped in try/catch so a single
     ///      failure never reverts the trade.
-    function _distributeFee(uint256 feeAmount, address referrer) internal {
+    function _distributeFee(uint256 feeAmount, uint256 tradeVolume, address referrer) internal {
         address quote = s_quoteAsset;
 
         // Creator share.
@@ -345,45 +386,59 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
             // AUDIT-FIX M-3: Check ETH transfer result instead of ignoring
             if (quote == address(0)) {
                 (bool ok,) = payable(s_creatorFeeVault).call{value: creatorShare}("");
-                if (!ok) { creatorShare = 0; } // skip accrue if funding failed
+                if (!ok) creatorShare = 0; // skip accrue if funding failed
             } else {
                 IERC20(quote).safeTransfer(s_creatorFeeVault, creatorShare);
             }
-            try ICreatorFeeVault(s_creatorFeeVault).accrueFees(s_token, s_creator, quote, creatorShare) {
-                // success — no-op
-            } catch {
+            try ICreatorFeeVault(s_creatorFeeVault)
+                .accrueFees(s_token, s_creator, quote, creatorShare) {
+            // success — no-op
+            }
+                catch {
                 // Non-blocking: fee simply not accrued.
             }
         }
 
-        // Referral share (only if a referrer is linked for the trader).
+        // Referral share. AUDIT-FIX H2: the permanent on-chain link (referrerOf) is
+        // AUTHORITATIVE. The trader-supplied `referrer` is only used to establish a link
+        // when none exists yet — it can never override an existing permanent link. This
+        // prevents a trader from bypassing / redirecting a referrer they previously linked.
         uint256 referralShare = (feeAmount * REFERRAL_FEE_SHARE) / 1e18;
-        if (referrer != address(0) && referralShare > 0 && s_referralRegistry != address(0)) {
-            address resolvedReferrer = referrer;
+        if (referralShare > 0 && s_referralRegistry != address(0)) {
+            // Resolve the AUTHORITATIVE permanent link first; only fall back to the
+            // trader-supplied referrer when no permanent link exists yet.
+            address resolvedReferrer;
             try IReferralRegistry(s_referralRegistry).referrerOf(msg.sender) returns (address r) {
-                if (r != address(0)) resolvedReferrer = r;
+                resolvedReferrer = r != address(0) ? r : referrer;
             } catch {
-                // ignore — use passed referrer
+                resolvedReferrer = referrer;
             }
-            // Fund the registry.
-            // AUDIT-FIX M-3: Check ETH transfer result
-            if (quote == address(0)) {
-                (bool ok,) = payable(s_referralRegistry).call{value: referralShare}("");
-                if (!ok) { referralShare = 0; }
+            // Nothing to pay if there is still no referrer.
+            if (resolvedReferrer == address(0)) {
+                referralShare = 0;
             } else {
-                IERC20(quote).safeTransfer(s_referralRegistry, referralShare);
-            }
-            try IReferralRegistry(s_referralRegistry).recordReferral(
-                msg.sender,
-                resolvedReferrer,
-                s_token,
-                feeAmount, // trade volume
-                referralShare,
-                quote
-            ) {
+                // Fund the registry.
+                // AUDIT-FIX M-3: Check ETH transfer result
+                if (quote == address(0)) {
+                    (bool ok,) = payable(s_referralRegistry).call{value: referralShare}("");
+                    if (!ok) referralShare = 0;
+                } else {
+                    IERC20(quote).safeTransfer(s_referralRegistry, referralShare);
+                }
+                try IReferralRegistry(s_referralRegistry)
+                    .recordReferral(
+                        msg.sender,
+                        resolvedReferrer,
+                        s_token,
+                        tradeVolume, // actual trade volume
+                        referralShare,
+                        quote
+                    ) {
                 // success
-            } catch {
-                // Non-blocking.
+                }
+                    catch {
+                    // Non-blocking.
+                }
             }
         }
 
@@ -395,16 +450,22 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
             // For ERC-20, transfer first then call distribute (which pulls via transferFrom).
             if (quote == address(0)) {
                 try IFeeRouter(s_feeRouter).distribute{value: routerShare}(quote, routerShare) {
-                    // success
-                } catch {
+                // success
+                }
+                    catch {
                     // Non-blocking: ETH stays in curve for rescue.
                 }
             } else {
-                IERC20(quote).safeTransfer(s_feeRouter, routerShare);
+                // AUDIT-FIX C3: FeeRouter.distribute pulls via safeTransferFrom, so the curve
+                // must APPROVE the router (not pre-transfer). Pre-transferring then relying on
+                // transferFrom double-handles funds and always reverts (curve never approved).
+                IERC20(quote).forceApprove(s_feeRouter, routerShare);
                 try IFeeRouter(s_feeRouter).distribute(quote, routerShare) {
-                    // success
-                } catch {
-                    // Non-blocking.
+                // success
+                }
+                catch {
+                    // Non-blocking: reset approval so no dangling allowance remains.
+                    IERC20(quote).forceApprove(s_feeRouter, 0);
                 }
             }
         }
@@ -413,7 +474,11 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
     /* ───────────────────────  Pricing — buy  ──────────────────── */
 
     /// @dev Compute tokens out for a buy of `quoteAmountIn`.
-    function _getBuyOut(uint256 quoteAmountIn) internal view returns (uint256 tokensOut, uint256 fee) {
+    function _getBuyOut(uint256 quoteAmountIn)
+        internal
+        view
+        returns (uint256 tokensOut, uint256 fee)
+    {
         fee = _currentFee();
         uint256 quoteAfterFee = quoteAmountIn - (quoteAmountIn * fee) / 1e18;
 
@@ -421,25 +486,26 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         tokensOut = tokens;
     }
 
-    /// @dev Curve-specific buy math.
+    /// @dev Constant-product buy math: `tokenOut = vToken - k/(vQuote + quoteIn)`.
+    ///      AUDIT-FIX CRITICAL: previously the three shapes used asymmetric closed-form
+    ///      approximations (sqrt / linear / pow1.5). The LOGARITHMIC form was NOT the inverse
+    ///      of its sell counterpart, which allowed a risk-free buy→sell round-trip that drained
+    ///      the curve. A single constant-product invariant (x·y=k) is symmetric by construction
+    ///      for every shape, so buy and sell are always exact inverses. The three shapes remain
+    ///      distinct via their initial virtual-reserve ratios (set by the factory), which give
+    ///      each a different starting price and steepness.
     function _buyTokenOut(uint256 quoteIn) internal view returns (uint256) {
-        uint256 vq = s_virtualQuoteReserves + quoteIn;
-        // invariant: tokenOut = virtualToken * (1 - (virtualQuote / vq)^(shape-specific))
-        if (s_curveShape == uint8(CurveShape.LINEAR)) {
-            // Linear: tokenOut = virtualToken * (1 - sqrt(virtualQuote / vq))
-            uint256 ratio = (s_virtualQuoteReserves * 1e36) / vq;
-            uint256 sq = _sqrt(ratio);
-            return (s_virtualTokenReserves * (1e18 - sq)) / 1e18;
-        } else if (s_curveShape == uint8(CurveShape.EXPONENTIAL)) {
-            // Exponential: tokenOut = virtualToken * (1 - (virtualQuote / vq))
-            uint256 ratio = (s_virtualQuoteReserves * 1e18) / vq;
-            return (s_virtualTokenReserves * (1e18 - ratio)) / 1e18;
-        } else {
-            // Logarithmic: tokenOut = virtualToken * (1 - pow1_5(virtualQuote / vq))
-            uint256 ratio = (s_virtualQuoteReserves * 1e18) / vq;
-            uint256 p = _pow1_5(ratio);
-            return (s_virtualTokenReserves * (1e18 - p)) / 1e18;
-        }
+        uint256 vQuote = s_virtualQuoteReserves;
+        uint256 vToken = s_virtualTokenReserves;
+        // k = vQuote * vToken (constant). After adding quoteIn, tokenOut keeps k invariant:
+        //   (vQuote + quoteIn) * (vToken - tokenOut) = vQuote * vToken
+        //   tokenOut = vToken - (vQuote * vToken) / (vQuote + quoteIn)
+        //            = vToken * quoteIn / (vQuote + quoteIn)
+        uint256 newVQuote = vQuote + quoteIn;
+        uint256 tokenOut = (vToken * quoteIn) / newVQuote;
+        // Never sell more tokens than remain in the virtual pool.
+        if (tokenOut >= vToken) return vToken - 1;
+        return tokenOut;
     }
 
     /* ───────────────────────  Pricing — sell  ─────────────────── */
@@ -455,24 +521,16 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         netQuoteOut = grossQuoteOut - (grossQuoteOut * fee) / 1e18;
     }
 
-    /// @dev Curve-specific sell math.
+    /// @dev Constant-product sell math — the exact inverse of `_buyTokenOut`:
+    ///      `quoteOut = vQuote - k/(vToken + tokensIn) = vQuote * tokensIn / (vToken + tokensIn)`.
+    ///      AUDIT-FIX CRITICAL: symmetric with the buy side for all shapes (see _buyTokenOut).
     function _sellQuoteOut(uint256 tokensIn) internal view returns (uint256) {
-        uint256 vt = s_virtualTokenReserves + tokensIn;
-        if (s_curveShape == uint8(CurveShape.LINEAR)) {
-            // Linear: quoteOut = virtualQuote * (1 - (virtualToken / vt)^2)
-            uint256 ratio = (s_virtualTokenReserves * 1e18) / vt;
-            uint256 sq = (ratio * ratio) / 1e18;
-            return (s_virtualQuoteReserves * (1e18 - sq)) / 1e18;
-        } else if (s_curveShape == uint8(CurveShape.EXPONENTIAL)) {
-            // Exponential: quoteOut = virtualQuote * (1 - (virtualToken / vt))
-            uint256 ratio = (s_virtualTokenReserves * 1e18) / vt;
-            return (s_virtualQuoteReserves * (1e18 - ratio)) / 1e18;
-        } else {
-            // Logarithmic: quoteOut = virtualQuote * (1 - pow1_5(virtualToken / vt))
-            uint256 ratio = (s_virtualTokenReserves * 1e18) / vt;
-            uint256 p = _pow1_5(ratio);
-            return (s_virtualQuoteReserves * (1e18 - p)) / 1e18;
-        }
+        uint256 vQuote = s_virtualQuoteReserves;
+        uint256 vToken = s_virtualTokenReserves;
+        uint256 newVToken = vToken + tokensIn;
+        uint256 quoteOut = (vQuote * tokensIn) / newVToken;
+        if (quoteOut >= vQuote) return vQuote - 1;
+        return quoteOut;
     }
 
     /* ───────────────────────  X-Mode fee  ─────────────────────── */
@@ -488,53 +546,16 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
         return XMODE_FEE_B0 - decay;
     }
 
-    /* ───────────────────────  Math helpers  ───────────────────── */
-
-    /// @dev Babylonian square root (1e18 input → 1e9 output scaled; caller rescales).
-    ///      AUDIT-FIX L-3: Bounded iteration to 256 steps (worst-case for type(uint256).max
-    ///      is ~128 iterations; 256 is a safe upper bound). Prevents gas grief if a
-    ///      malicious or attacker-controlled input is passed.
-    function _sqrt(uint256 x) internal pure returns (uint256) {
-        if (x == 0) return 0;
-        uint256 r = x;
-        uint256 t = (x + 1) / 2;
-        for (uint256 i = 0; i < 256; i++) {
-            if (t >= r) break;
-            r = t;
-            t = (x / t + t) / 2;
-        }
-        return r;
-    }
-
-    /// @dev x^1.5 in 1e18 fixed point via Newton's method (3 iterations).
-    ///      Overflow-safe: input clamped to [0, 1e18].
-    function _pow1_5(uint256 x) internal pure returns (uint256) {
-        if (x == 0) return 0;
-        if (x == 1e18) return 1e18;
-        // x^1.5 = x * sqrt(x). sqrt in 1e18 → result in 1e18.
-        uint256 s = _sqrt1e18(x);
-        return (x * s) / 1e18;
-    }
-
-    /// @dev sqrt for 1e18-fixed values → 1e18 result (Babylonian).
-    function _sqrt1e18(uint256 x) internal pure returns (uint256) {
-        if (x == 0) return 0;
-        uint256 r = x;
-        // Newton: r = (r + x/r) / 2, but scale for 1e18.
-        uint256 t = (x / 1e18 + 1) / 2 * 1e18;
-        for (uint256 i = 0; i < 40; i++) {
-            if (t >= r) break;
-            r = t;
-            t = ((x * 1e18) / t + t) / 2;
-        }
-        return r;
-    }
-
     /* ───────────────────────  Price  ──────────────────────────── */
 
     /// @inheritdoc IBondingCurve
     function price() public view override returns (uint256) {
-        // Marginal price = virtualQuoteReserves / virtualTokenReserves (1e18 fixed).
+        // Marginal price = virtualQuoteReserves / virtualTokenReserves, expressed as
+        // quote-wei per 1e18 token (1e18 fixed point). This is the derivative of the
+        // curve at the current reserves and is consistent with _buyTokenOut/_sellQuoteOut
+        // which operate on the same virtual-reserve ratios. Virtual reserves scale
+        // proportionally with the supply tier (both quote and token ×tierMultiplier), so
+        // the ratio — and therefore these absolute START/END clamps — are tier-invariant.
         if (s_virtualTokenReserves == 0) return START_PRICE;
         uint256 p = (s_virtualQuoteReserves * 1e18) / s_virtualTokenReserves;
         if (p < START_PRICE) return START_PRICE;
@@ -543,13 +564,23 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
     }
 
     /// @inheritdoc IBondingCurve
-    function getBuyOut(uint256 quoteAmountIn) external view override returns (uint256 tokensOut, uint256 fee) {
+    function getBuyOut(uint256 quoteAmountIn)
+        external
+        view
+        override
+        returns (uint256 tokensOut, uint256 fee)
+    {
         return _getBuyOut(quoteAmountIn);
     }
 
     /// @inheritdoc IBondingCurve
-    function getSellOut(uint256 tokenAmountIn) external view override returns (uint256 quoteOut, uint256 fee) {
-        (quoteOut, fee,) = _getSellOut(tokenAmountIn);
+    function getSellOut(uint256 tokenAmountIn)
+        external
+        view
+        override
+        returns (uint256 quoteOut, uint256 fee)
+    {
+        (, fee, quoteOut) = _getSellOut(tokenAmountIn);
     }
 
     /* ───────────────────────  Rescue  ─────────────────────────── */

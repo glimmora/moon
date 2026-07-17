@@ -22,6 +22,7 @@ interface IBondingCurve {
     error ZeroAddress(); // AUDIT-FIX L-2
     error InsufficientQuote();
     error InsufficientTokens();
+    error SlippageExceeded(); // AUDIT-FIX L1: dedicated error for min-out slippage failures
     error AlreadyGraduated();
     error NotGraduated();
     error RescueBlocked();

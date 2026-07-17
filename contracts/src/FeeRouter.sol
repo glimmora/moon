@@ -125,6 +125,26 @@ contract FeeRouter is AccessControl, ReentrancyGuard, IFeeRouter {
         emit CallerRevoked(curve);
     }
 
+    /// @inheritdoc IFeeRouter
+    function setTreasury(address treasury_) external override onlyRole(ADMIN_ROLE) {
+        if (treasury_ == address(0)) revert ZeroAddress();
+        emit TreasuryUpdated(treasury, treasury_);
+        treasury = treasury_;
+    }
+
+    /// @inheritdoc IFeeRouter
+    function rescue(address token, address to, uint256 amount) external override onlyRole(ADMIN_ROLE) {
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (token == address(0)) {
+            (bool ok,) = payable(to).call{value: amount}("");
+            if (!ok) revert PushFailed();
+        } else {
+            IERC20(token).safeTransfer(to, amount);
+        }
+        emit Rescued(token, to, amount);
+    }
+
     /* ───────────────────────  Getters  ────────────────────────── */
 
     function hasCallerRole(address account) external view returns (bool) {

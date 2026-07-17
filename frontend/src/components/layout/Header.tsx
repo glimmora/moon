@@ -70,7 +70,7 @@ export function Header() {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1 ml-2">
+          <nav className="hidden md:flex items-center gap-1 ml-2" aria-label="Primary">
             {NAV.map((item) => {
               const active = pathname === item.to;
               const Icon = item.icon;
@@ -78,6 +78,7 @@ export function Header() {
                 <Link
                   key={item.to}
                   to={item.to}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
                     active
@@ -100,6 +101,7 @@ export function Header() {
           {/* Search trigger (desktop) */}
           <button
             onClick={() => setSearchOpen(true)}
+            aria-label="Open search (Command or Control K)"
             className={cn(
               "hidden lg:flex items-center gap-2 ml-2 rounded-xl border px-3 py-2 text-sm transition-colors w-48",
               theme === "light"
@@ -160,6 +162,9 @@ export function Header() {
         <div
           className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] px-4 animate-fade-in"
           onClick={() => setSearchOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search tokens"
         >
           <div className={cn(
             "absolute inset-0 backdrop-blur-sm",
@@ -245,6 +250,9 @@ function NetworkDropdown() {
       {/* Trigger button */}
       <button
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Select network"
         className={cn(
           "flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all",
           isTestnet
@@ -266,6 +274,8 @@ function NetworkDropdown() {
       {/* Dropdown */}
       {open && (
         <div
+          role="menu"
+          aria-label="Networks"
           className={cn(
             "absolute top-full right-0 mt-2 w-64 rounded-xl border shadow-xl overflow-hidden animate-scale-in z-[60]",
             theme === "light"
@@ -319,6 +329,7 @@ function NetworkDropdown() {
               return (
                 <button
                   key={id}
+                  role="menuitem"
                   onClick={() => selectChain(id)}
                   className={cn(
                     "flex items-center gap-3 w-full px-3 py-2 text-sm transition-colors text-left",
@@ -401,6 +412,9 @@ function WalletButton() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Account menu"
         className={cn(
           "flex items-center gap-2 rounded-xl border px-2.5 py-1.5 text-sm transition-all",
           theme === "light"
@@ -432,6 +446,8 @@ function WalletButton() {
 
       {open && (
         <div
+          role="menu"
+          aria-label="Account"
           className={cn(
             "absolute top-full right-0 mt-2 w-56 rounded-xl border shadow-xl overflow-hidden animate-scale-in z-[60]",
             theme === "light"
@@ -462,6 +478,7 @@ function WalletButton() {
               <Link
                 key={item.to}
                 to={item.to}
+                role="menuitem"
                 onClick={() => setOpen(false)}
                 className={cn(
                   "flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors",
@@ -482,6 +499,7 @@ function WalletButton() {
 
           <div className={cn("border-t", theme === "light" ? "border-neutral-100" : "border-white/[0.04]")}>
             <button
+              role="menuitem"
               onClick={() => { disconnect(); setOpen(false); }}
               className={cn(
                 "flex w-full items-center gap-2.5 px-4 py-2.5 text-sm transition-colors",

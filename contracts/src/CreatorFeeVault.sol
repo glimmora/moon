@@ -51,6 +51,8 @@ contract CreatorFeeVault is AccessControl, ReentrancyGuard, ICreatorFeeVault {
     {
         if (amount == 0) revert ZeroAmount();
         if (token == address(0)) revert InvalidToken();
+        // AUDIT-FIX M4: reject zero creator so fees can never accrue to an unclaimable address.
+        if (creator == address(0)) revert ZeroAddress();
 
         // Set the creator on first accrue — immutable afterwards.
         address existing = creatorOf[token];

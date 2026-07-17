@@ -20,6 +20,9 @@ interface IMoonBurner {
     event BuybackSkipped(uint256 quoteAmount, string reason);
     // NOTE: Paused/Unpaused events are inherited from OpenZeppelin's Pausable — not redeclared here.
     event Rescued(address indexed token, address indexed to, uint256 amount);
+    event MoonTokenSet(address indexed newMoonToken);
+    event DexRouterUpdated(address indexed oldRouter, address indexed newRouter);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
 
     /* ─────────────────────────  Core  ─────────────────────────── */
 

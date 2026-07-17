@@ -1,4 +1,5 @@
 /** Formatting helpers — all on-chain values use 1e18 fixed point. */
+import { GRADUATION_THRESHOLDS } from "./curve";
 
 export function formatToken(amount: bigint, decimals = 18, displayDecimals = 2): string {
   if (amount === 0n) return "0";
@@ -67,4 +68,11 @@ export function formatCompact(n: number): string {
   if (Math.abs(n) < 0.001) return n.toExponential(2);
   if (Math.abs(n) < 1) return n.toFixed(4);
   return formatNumber(n);
+}
+
+export function graduationProgress(volume24h: number, supplyTier: number): number {
+  const threshold = GRADUATION_THRESHOLDS[supplyTier] ?? 50;
+  if (threshold <= 0) return 0;
+  // Report true progress (no artificial floor) so a token with no volume reads 0%.
+  return Math.min(100, Math.max(0, (volume24h / threshold) * 100));
 }
