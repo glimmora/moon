@@ -49,7 +49,8 @@ contract MoonV3Concentrator is AccessControl, ReentrancyGuard, IMoonV3Concentrat
         // strand LP if burn() reverted, while never minting the promised V3 position.
         // Until real V3 minting is implemented, this function is disabled to prevent any
         // possibility of fund loss.
-        pair; lpAmount; // silence unused-parameter warnings
+        pair; // silence unused-parameter warnings
+        lpAmount;
         revert NotImplemented();
     }
 
@@ -63,7 +64,11 @@ contract MoonV3Concentrator is AccessControl, ReentrancyGuard, IMoonV3Concentrat
     }
 
     /// @inheritdoc IMoonV3Concentrator
-    function rescue(address token, address to, uint256 amount) external override onlyRole(ADMIN_ROLE) {
+    function rescue(address token, address to, uint256 amount)
+        external
+        override
+        onlyRole(ADMIN_ROLE)
+    {
         if (token == moonToken) revert RescueBlocked();
         if (to == address(0)) revert ZeroAddress();
         if (token == address(0)) {

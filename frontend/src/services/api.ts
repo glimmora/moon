@@ -127,6 +127,27 @@ async function getJson<T>(path: string): Promise<T> {
   }
 }
 
+/**
+ * Coerce a date-like value to epoch milliseconds. The backend serializes Prisma
+ * `DateTime` columns as ISO strings, but the frontend models these fields as
+ * `number` (epoch ms) so it can do arithmetic and pass them to `timeAgo`. This
+ * normalizes both shapes (and already-numeric values) to a safe number.
+ */
+function toEpochMs(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const t = Date.parse(value);
+    if (!Number.isNaN(t)) return t;
+  }
+  if (value instanceof Date) return value.getTime();
+  return 0;
+}
+
+/** Normalize the date fields on a token-list/meta object in place. */
+function normalizeTokenDates<T extends { createdAt?: unknown }>(t: T): T {
+  return { ...t, createdAt: toEpochMs(t.createdAt) };
+}
+
 export interface TokenMeta {
   address: string;
   chainId: number;
@@ -161,21 +182,25 @@ export interface Trade {
 }
 
 export const api = {
-  getTokens(chainId?: number): Promise<TokenListItem[]> {
+  async getTokens(chainId?: number): Promise<TokenListItem[]> {
     const qs = chainId ? `?chainId=${chainId}` : "";
-    return getJson(`/api/tokens${qs}`);
+    const items = await getJson<TokenListItem[]>(`/api/tokens${qs}`);
+    return items.map(normalizeTokenDates);
   },
 
-  getToken(chainId: number, address: string): Promise<TokenMeta> {
-    return getJson(`/api/tokens/${chainId}/${address}`);
+  async getToken(chainId: number, address: string): Promise<TokenMeta> {
+    return normalizeTokenDates(await getJson<TokenMeta>(`/api/tokens/${chainId}/${address}`));
   },
 
-  getTrades(chainId: number, address: string, limit = 50): Promise<Trade[]> {
-    return getJson(`/api/tokens/${chainId}/${address}/trades?limit=${limit}`);
+  async getTrades(chainId: number, address: string, limit = 50): Promise<Trade[]> {
+    const trades = await getJson<Trade[]>(`/api/tokens/${chainId}/${address}/trades?limit=${limit}`);
+    return trades.map((t) => ({ ...t, timestamp: toEpochMs(t.timestamp) }));
   },
 
   getHolders(chainId: number, address: string) {
-    return getJson<Holder[]>(`/api/tokens/${chainId}/${address}/holders`);
+    return getJson<Holder[]>(`/api/tokens/${chainId}/${address}/holders`).then((items) =>
+      items.map((h) => ({ ...h, firstSeen: toEpochMs(h.firstSeen) })),
+    );
   },
 
   getBubblemap(chainId: number, address: string) {
@@ -197,12 +222,18 @@ export const api = {
   },
 
   search(q: string) {
-    return getJson<TokenListItem[]>(`/api/search?q=${encodeURIComponent(q)}`);
+    return getJson<TokenListItem[]>(`/api/search?q=${encodeURIComponent(q)}`).then((items) =>
+      items.map(normalizeTokenDates),
+    );
   },
 
   /* ── Portfolio ── */
   getPortfolio(address: string): Promise<Portfolio> {
-    return getJson<Portfolio>(`/api/portfolio/${address}`);
+    return getJson<Portfolio>(`/api/portfolio/${address}`).then((p) => ({
+      ...p,
+      createdTokens: p.createdTokens.map((t) => ({ ...t, createdAt: toEpochMs(t.createdAt) })),
+      recentTrades: p.recentTrades.map((t) => ({ ...t, timestamp: toEpochMs(t.timestamp) })),
+    }));
   },
 
   /* ── Leaderboard ── */
@@ -215,6 +246,8 @@ export const api = {
   },
 
   getTopTokens(sort: "volume" | "holders" | "marketcap" = "volume", limit = 50): Promise<LeaderboardToken[]> {
-    return getJson<LeaderboardToken[]>(`/api/leaderboard/tokens?sort=${sort}&limit=${limit}`);
+    return getJson<LeaderboardToken[]>(`/api/leaderboard/tokens?sort=${sort}&limit=${limit}`).then((items) =>
+      items.map((t) => ({ ...t, createdAt: toEpochMs(t.createdAt) })),
+    );
   },
 };

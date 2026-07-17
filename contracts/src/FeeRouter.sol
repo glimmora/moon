@@ -52,7 +52,13 @@ contract FeeRouter is AccessControl, ReentrancyGuard, IFeeRouter {
     /* ───────────────────────  Core  ───────────────────────────── */
 
     /// @inheritdoc IFeeRouter
-    function distribute(address quoteAsset, uint256 amount) external payable override onlyRole(CALLER_ROLE) nonReentrant {
+    function distribute(address quoteAsset, uint256 amount)
+        external
+        payable
+        override
+        onlyRole(CALLER_ROLE)
+        nonReentrant
+    {
         if (amount == 0) revert ZeroAmount();
 
         // Pull the quote asset from the caller (the bonding curve).
@@ -74,9 +80,12 @@ contract FeeRouter is AccessControl, ReentrancyGuard, IFeeRouter {
         if (moonBurner != address(0) && burnShare > 0) {
             _send(quoteAsset, moonBurner, burnShare);
             // Non-blocking buyback+burn.
-            try IMoonBurner(moonBurner).buybackAndBurn(quoteAsset, burnShare) returns (uint256) {
-                // success
-            } catch {
+            try IMoonBurner(moonBurner).buybackAndBurn(quoteAsset, burnShare) returns (
+                uint256
+            ) {
+            // success
+            }
+                catch {
                 // Buyback failed — funds stay in MoonBurner for next attempt.
             }
         } else {
@@ -92,7 +101,11 @@ contract FeeRouter is AccessControl, ReentrancyGuard, IFeeRouter {
     /* ───────────────────────  Admin  ──────────────────────────── */
 
     /// @inheritdoc IFeeRouter
-    function setShares(uint256 devBps_, uint256 burnBps_, uint256 treasuryBps_) external override onlyRole(ADMIN_ROLE) {
+    function setShares(uint256 devBps_, uint256 burnBps_, uint256 treasuryBps_)
+        external
+        override
+        onlyRole(ADMIN_ROLE)
+    {
         if (devBps_ + burnBps_ + treasuryBps_ != 10_000) revert InvalidShares();
         devBps = devBps_;
         burnBps = burnBps_;
@@ -133,7 +146,11 @@ contract FeeRouter is AccessControl, ReentrancyGuard, IFeeRouter {
     }
 
     /// @inheritdoc IFeeRouter
-    function rescue(address token, address to, uint256 amount) external override onlyRole(ADMIN_ROLE) {
+    function rescue(address token, address to, uint256 amount)
+        external
+        override
+        onlyRole(ADMIN_ROLE)
+    {
         if (to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         if (token == address(0)) {

@@ -24,6 +24,8 @@ int_types = "long"
 quote_style = "double"
 number_underscore = "preserve"
 
-[profile.ci]
-fuzz_runs = 2000
-invariant_runs = 500
+[profile.ci.fuzz]
+runs = 2000
+
+[profile.ci.invariant]
+runs = 500

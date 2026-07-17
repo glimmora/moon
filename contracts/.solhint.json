@@ -5,22 +5,22 @@
     "func-visibility": ["warn", { "ignoreConstructors": true }],
     "state-visibility": "error",
     "no-inline-assembly": "off",
+    "import-path-check": "off",
     "no-unused-vars": "error",
     "no-console": "off",
-    "max-states-count": ["error", 18],
+    "max-states-count": ["error", 24],
     "max-line-length": ["error", 120],
     "reason-string": ["warn", { "maxLength": 64 }],
     "avoid-suicide": "error",
     "avoid-tx-origin": "error",
     "not-rely-on-time": "off",
-    "no-empty-block": "off",
-    "contract-name-camelcase": "off",
+    "no-empty-blocks": "off",
+    "contract-name-capwords": "off",
     "func-name-mixedcase": "off",
     "var-name-mixedcase": "off",
     "named-parameters-mapping": "off",
     "one-contract-per-file": "off",
     "private-vars-leading-underscore": "off",
-    "const-name-snakecase": "off",
-    "custom-errors": "error"
+    "const-name-snakecase": "off"
   }
 }

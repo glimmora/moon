@@ -29,12 +29,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
 ENV NODE_ENV=production
 WORKDIR /app/backend
 
-# Copy built app + node_modules (incl. generated Prisma client).
-COPY --from=build /app/backend/dist ./dist
-COPY --from=build /app/backend/node_modules ./node_modules
-COPY --from=build /app/backend/package.json ./package.json
-COPY --from=build /app/backend/prisma ./prisma
-COPY --from=build /app/node_modules /app/node_modules
+# Copy built app + node_modules (incl. generated Prisma client).  The build
+# stage runs as root so we chown to the runtime `node` user for correct file
+# permissions.
+COPY --chown=node:node --from=build /app/backend/dist ./dist
+COPY --chown=node:node --from=build /app/backend/node_modules ./node_modules
+COPY --chown=node:node --from=build /app/backend/package.json ./package.json
+COPY --chown=node:node --from=build /app/backend/prisma ./prisma
+COPY --chown=node:node --from=build /app/node_modules /app/node_modules
 
 # Run as the built-in non-root `node` user.
 USER node

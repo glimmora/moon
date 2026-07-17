@@ -31,18 +31,10 @@ interface IBondingCurve {
 
     event __Init(address indexed token, address indexed quoteAsset, address indexed factory);
     event Bought(
-        address indexed buyer,
-        uint256 quoteIn,
-        uint256 tokensOut,
-        uint256 fee,
-        uint256 priceAfter
+        address indexed buyer, uint256 quoteIn, uint256 tokensOut, uint256 fee, uint256 priceAfter
     );
     event Sold(
-        address indexed seller,
-        uint256 tokensIn,
-        uint256 quoteOut,
-        uint256 fee,
-        uint256 priceAfter
+        address indexed seller, uint256 tokensIn, uint256 quoteOut, uint256 fee, uint256 priceAfter
     );
     event Graduated(
         address indexed token,
@@ -66,12 +58,17 @@ interface IBondingCurve {
 
     /// @notice Buy tokens with `quoteAmountIn` of the quote asset.
     /// @dev Mints tokens to `buyer` via IMoonToken.mint.
-    function buy(uint256 quoteAmountIn, uint256 minTokensOut, address referrer) external payable returns (uint256 tokensOut);
+    function buy(uint256 quoteAmountIn, uint256 minTokensOut, address referrer)
+        external
+        payable
+        returns (uint256 tokensOut);
 
     /// @notice Sell `tokenAmountIn` tokens for the quote asset.
     /// @dev CEI: effects → interactions → burnFrom LAST.
     // AUDIT-FIX H-1: Add referrer parameter to sell()
-    function sell(uint256 tokenAmountIn, uint256 minQuoteOut, address referrer) external returns (uint256 quoteOut);
+    function sell(uint256 tokenAmountIn, uint256 minQuoteOut, address referrer)
+        external
+        returns (uint256 quoteOut);
 
     /// @notice Graduate the token to DEX trading once threshold reached.
     function graduate() external;

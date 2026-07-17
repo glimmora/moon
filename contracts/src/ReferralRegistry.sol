@@ -102,7 +102,12 @@ contract ReferralRegistry is AccessControl, ReentrancyGuard, IReferralRegistry {
     /* ───────────────────────  Claims  ─────────────────────────── */
 
     /// @inheritdoc IReferralRegistry
-    function claimRewards(address quoteAsset) external override nonReentrant returns (uint256 amount) {
+    function claimRewards(address quoteAsset)
+        external
+        override
+        nonReentrant
+        returns (uint256 amount)
+    {
         amount = claimableRewards[msg.sender][quoteAsset];
         if (amount == 0) revert NoClaimable();
 

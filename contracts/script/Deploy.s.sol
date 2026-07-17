@@ -84,9 +84,8 @@ abstract contract DeployScript is Script {
         // buybackAndBurn calls succeed. Without this, the 30% burn share is transferred
         // to the MoonBurner but buybackAndBurn always reverts (caught by try/catch),
         // permanently stranding those funds.
-        MoonBurner(payable(d.moonBurner)).grantRole(
-            MoonBurner(payable(d.moonBurner)).CALLER_ROLE(), d.feeRouter
-        );
+        MoonBurner(payable(d.moonBurner))
+            .grantRole(MoonBurner(payable(d.moonBurner)).CALLER_ROLE(), d.feeRouter);
 
         // AUDIT-FIX H1: configure the DEX router (used by both graduation LP seeding and
         // MoonBurner buyback swaps) when provided via env.

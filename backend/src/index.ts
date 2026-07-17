@@ -1,12 +1,7 @@
-import express from "express";
-import cors from "cors";
-import helmet from "helmet";
-import compression from "compression";
 import http from "node:http";
 import { env } from "./config/env.js";
 import { logger } from "./utils/logger.js";
-import { apiRouter } from "./routes/api.js";
-import { authRouter } from "./routes/auth.js";
+import { createApp } from "./app.js";
 import { setupSockets } from "./sockets/server.js";
 import { activeChains } from "./config/chains.js";
 import { startChainListener, stopChainListener } from "./listeners/chainListener.js";
@@ -18,32 +13,7 @@ let shutdown: (() => Promise<void>) | null = null;
 async function main() {
   logger.info({ env: env.NODE_ENV, port: env.BACKEND_PORT }, "Starting moon.fun backend");
 
-  const app = express();
-  app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(compression());
-  app.set("trust proxy", 1);
-  app.use(cors({ origin: env.CORS_ORIGIN.split(",").map((s) => s.trim()) }));
-  app.use(express.json({ limit: "100kb" }));
-
-  app.get("/health", async (_req, res) => {
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      res.json({ status: "ok", ts: Date.now() });
-    } catch {
-      res.status(503).json({ status: "degraded", ts: Date.now() });
-    }
-  });
-  app.use("/api/auth", authRouter);
-  app.use("/api", apiRouter);
-
-  // 404
-  app.use((_req, res) => res.status(404).json({ error: "Not found" }));
-
-  // Error handler
-  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    logger.error({ err }, "Unhandled API error");
-    res.status(500).json({ error: "Internal server error" });
-  });
+  const app = createApp();
 
   const server = http.createServer(app);
   const io = setupSockets(server);

@@ -77,12 +77,7 @@ contract CreatorFeeVault is AccessControl, ReentrancyGuard, ICreatorFeeVault {
     /* ───────────────────────  Claims  ─────────────────────────── */
 
     /// @inheritdoc ICreatorFeeVault
-    function claimFees(address quoteAsset)
-        external
-        override
-        nonReentrant
-        returns (uint256 amount)
-    {
+    function claimFees(address quoteAsset) external override nonReentrant returns (uint256 amount) {
         amount = claimable[msg.sender][quoteAsset];
         if (amount == 0) revert NoClaimable();
 

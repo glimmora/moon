@@ -76,8 +76,9 @@ contract MoonFactory is AccessControl, IMoonFactory {
         address bondingCurveImpl_
     ) {
         if (
-            feeRouter_ == address(0) || creatorFeeVault_ == address(0) || referralRegistry_ == address(0)
-                || treasury_ == address(0) || moonTokenImpl_ == address(0) || bondingCurveImpl_ == address(0)
+            feeRouter_ == address(0) || creatorFeeVault_ == address(0)
+                || referralRegistry_ == address(0) || treasury_ == address(0)
+                || moonTokenImpl_ == address(0) || bondingCurveImpl_ == address(0)
         ) revert ZeroAddress();
 
         feeRouter = feeRouter_;
@@ -121,8 +122,10 @@ contract MoonFactory is AccessControl, IMoonFactory {
         // Compute reserves for the tier + curve.
         uint256 totalSupplyInit = totalSupplyForTier(params.supplyTier);
         uint256 realTokenReservesInit = realReservesForTier(params.supplyTier);
-        uint256 virtualTokenReservesInit = _virtualTokenReserves(params.curveShape, params.supplyTier);
-        uint256 virtualQuoteReservesInit = _virtualQuoteReserves(params.curveShape, params.supplyTier);
+        uint256 virtualTokenReservesInit =
+            _virtualTokenReserves(params.curveShape, params.supplyTier);
+        uint256 virtualQuoteReservesInit =
+            _virtualQuoteReserves(params.curveShape, params.supplyTier);
 
         // Initialize the token (factory is the minter).
         IMoonToken.InitParams memory ip = IMoonToken.InitParams({
@@ -138,33 +141,49 @@ contract MoonFactory is AccessControl, IMoonFactory {
 
         // Initialize the bonding curve. quoteAsset = address(0) (native) by default; the
         // factory can be extended to support ERC20 quote assets per-chain.
-        BondingCurve(payable(curve)).__init(
-            token,
-            address(0), // native quote
-            msg.sender, // creator
-            feeRouter,
-            creatorFeeVault,
-            referralRegistry,
-            dexRouter, // AUDIT-FIX H1: pass the configured DEX router so graduation seeds LP
-            params.curveShape,
-            totalSupplyInit,
-            realTokenReservesInit,
-            virtualTokenReservesInit,
-            virtualQuoteReservesInit
-        );
+        BondingCurve(payable(curve))
+            .__init(
+                token,
+                address(0), // native quote
+                msg.sender, // creator
+                feeRouter,
+                creatorFeeVault,
+                referralRegistry,
+                dexRouter, // AUDIT-FIX H1: pass the configured DEX router so graduation seeds LP
+                params.curveShape,
+                totalSupplyInit,
+                realTokenReservesInit,
+                virtualTokenReservesInit,
+                virtualQuoteReservesInit
+            );
 
         // Grant the curve the roles it needs on the shared infra (non-blocking try/catch).
         // Emit events on failure so off-chain indexers can detect and retry.
-        try IFeeRouter(feeRouter).grantCallerRole(curve) {} catch { emit RoleGrantFailed("grantCallerRole", curve); }
-        try ICreatorFeeVault(creatorFeeVault).grantAccruerRole(curve) {} catch { emit RoleGrantFailed("grantAccruerRole", curve); }
-        try IReferralRegistry(referralRegistry).grantReferrerRole(curve) {} catch { emit RoleGrantFailed("grantReferrerRole", curve); }
+        try IFeeRouter(feeRouter).grantCallerRole(curve) {}
+        catch {
+            emit RoleGrantFailed("grantCallerRole", curve);
+        }
+        try ICreatorFeeVault(creatorFeeVault).grantAccruerRole(curve) {}
+        catch {
+            emit RoleGrantFailed("grantAccruerRole", curve);
+        }
+        try IReferralRegistry(referralRegistry).grantReferrerRole(curve) {}
+        catch {
+            emit RoleGrantFailed("grantReferrerRole", curve);
+        }
 
         // AUDIT-FIX CRITICAL: Grant the curve MINTER_ROLE on the token so it can
         // mint (on buy) and burnFrom (on sell). The factory has MINTER_ROLE from
         // initialize(), and as MINTER it can grant the role to the curve.
-        try IMoonToken(token).grantMinterRole(curve) {} catch { emit RoleGrantFailed("grantMinterRole", curve); }
+        try IMoonToken(token).grantMinterRole(curve) {}
+        catch {
+            emit RoleGrantFailed("grantMinterRole", curve);
+        }
         // Also exempt the curve from token transfer limits (max-tx/max-hold/cooldown).
-        try IMoonToken(token).setExempt(curve, true) {} catch { emit RoleGrantFailed("setExempt", curve); }
+        try IMoonToken(token).setExempt(curve, true) {}
+        catch {
+            emit RoleGrantFailed("setExempt", curve);
+        }
 
         allTokens.push(token);
 

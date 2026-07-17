@@ -18,7 +18,9 @@ interface ICreatorFeeVault {
 
     /* ─────────────────────────  Events  ───────────────────────── */
 
-    event FeesAccrued(address indexed token, address indexed creator, address quoteAsset, uint256 amount);
+    event FeesAccrued(
+        address indexed token, address indexed creator, address quoteAsset, uint256 amount
+    );
     event FeesClaimed(address indexed creator, address indexed quoteAsset, uint256 amount);
     event AccruerGranted(address indexed curve);
     event AccruerRevoked(address indexed curve);

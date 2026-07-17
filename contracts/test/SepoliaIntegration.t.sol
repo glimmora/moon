@@ -90,11 +90,8 @@ contract SepoliaIntegrationTest is Test {
     function test_CreateTokens_AllTiersAndCurves() public {
         uint8[3] memory tiers = [0, 1, 2]; // 1B, 10B, 100B
         uint8[3] memory curves = [0, 1, 2]; // LINEAR, EXPONENTIAL, LOGARITHMIC
-        uint256[3] memory expectedSupply = [
-            uint256(1_000_000_000e18),
-            10_000_000_000e18,
-            100_000_000_000e18
-        ];
+        uint256[3] memory expectedSupply =
+            [uint256(1_000_000_000e18), 10_000_000_000e18, 100_000_000_000e18];
 
         uint256 initialLength = factory.allTokensLength();
 
@@ -117,10 +114,16 @@ contract SepoliaIntegrationTest is Test {
                 assertEq(c.token(), token, "curve.token mismatch");
                 assertEq(c.factory(), address(factory), "curve.factory mismatch");
                 assertEq(c.graduated(), false, "should not be graduated");
-                assertEq(c.s_totalSupplyInit(), expectedSupply[i], "curve.s_totalSupplyInit mismatch");
+                assertEq(
+                    c.s_totalSupplyInit(), expectedSupply[i], "curve.s_totalSupplyInit mismatch"
+                );
 
                 // Verify factory registered the token.
-                assertEq(factory.allTokens(initialLength + i * 3 + j), token, "factory.allTokens mismatch");
+                assertEq(
+                    factory.allTokens(initialLength + i * 3 + j),
+                    token,
+                    "factory.allTokens mismatch"
+                );
             }
         }
 
@@ -166,11 +169,17 @@ contract SepoliaIntegrationTest is Test {
         assertEq(t.totalSupply(), tokensOut, "totalSupply should equal minted (Option B)");
 
         // Verify reserve update (Option B: tokensOut added to realTokenReserves).
-        assertEq(c.s_realTokenReserves(), tokensOut, "realTokenReserves should increase by tokensOut");
+        assertEq(
+            c.s_realTokenReserves(), tokensOut, "realTokenReserves should increase by tokensOut"
+        );
 
         // Verify quote reserve increased by (quoteIn - fee).
         uint256 expectedQuoteReserve = quoteIn - (quoteIn * fee) / 1e18;
-        assertEq(c.s_realQuoteReserves(), expectedQuoteReserve, "realQuoteReserves should be quoteIn - fee");
+        assertEq(
+            c.s_realQuoteReserves(),
+            expectedQuoteReserve,
+            "realQuoteReserves should be quoteIn - fee"
+        );
 
         console2.log("[PASS] Test 2: Buy minted tokens, fee pct:");
         console2.log("  tokens:", tokensOut / 1e18);
@@ -211,7 +220,11 @@ contract SepoliaIntegrationTest is Test {
 
         // Verify burn (CEI: burn is LAST).
         assertEq(t.balanceOf(alice), aliceBalance - sellAmount, "alice balance should decrease");
-        assertEq(t.totalSupply(), supplyBefore - sellAmount, "totalSupply should decrease (Option B burn)");
+        assertEq(
+            t.totalSupply(),
+            supplyBefore - sellAmount,
+            "totalSupply should decrease (Option B burn)"
+        );
 
         // Verify quote transfer — alice should have received ETH.
         assertGt(quoteOut, 0, "quoteOut should be > 0");
@@ -365,7 +378,11 @@ contract SepoliaIntegrationTest is Test {
         uint256 realReservesInit = 793_100_000e18;
 
         // Buy in chunks until graduated.
-        for (uint256 i = 0; i < 50 && c.s_realTokenReserves() < realReservesInit && !c.graduated(); i++) {
+        for (
+            uint256 i = 0;
+            i < 50 && c.s_realTokenReserves() < realReservesInit && !c.graduated();
+            i++
+        ) {
             uint256 quoteIn = 0.5 ether;
             vm.deal(alice, quoteIn * 50);
             (uint256 tokensOut,) = c.getBuyOut(quoteIn);
@@ -384,10 +401,16 @@ contract SepoliaIntegrationTest is Test {
             console2.log("[PASS] Test 7: Token graduated");
             console2.log("  tokens bought:", totalBought / 1e18);
             // Total supply should now be totalSupplyInit (minted reserved for LP).
-            assertEq(t.totalSupply(), c.s_totalSupplyInit(), "totalSupply should equal totalSupplyInit after graduation");
+            assertEq(
+                t.totalSupply(),
+                c.s_totalSupplyInit(),
+                "totalSupply should equal totalSupplyInit after graduation"
+            );
         } else {
             // Graduation is expensive — skip but log.
-            console2.log("[INFO] Test 7: Graduation not reached (too expensive in gas), skipping assertion");
+            console2.log(
+                "[INFO] Test 7: Graduation not reached (too expensive in gas), skipping assertion"
+            );
         }
     }
 
@@ -437,11 +460,18 @@ contract SepoliaIntegrationTest is Test {
 
         // Buy a lot to trigger graduation (with dexRouter = address(0), LP will fail gracefully).
         uint256 realReservesInit = 793_100_000e18;
-        for (uint256 i = 0; i < 50 && c.s_realTokenReserves() < realReservesInit && !c.graduated(); i++) {
+        for (
+            uint256 i = 0;
+            i < 50 && c.s_realTokenReserves() < realReservesInit && !c.graduated();
+            i++
+        ) {
             (uint256 tokensOut,) = c.getBuyOut(0.5 ether);
             if (tokensOut == 0) break;
             vm.prank(alice);
-            try c.buy{value: 0.5 ether}(0.5 ether, 0, address(0)) {} catch { break; }
+            try c.buy{value: 0.5 ether}(0.5 ether, 0, address(0)) {}
+            catch {
+                break;
+            }
         }
 
         if (c.graduated()) {
@@ -602,7 +632,10 @@ contract SepoliaIntegrationTest is Test {
     /* ──────────────────────────────────────────────────────────────────────
        Helpers
        ────────────────────────────────────────────────────────────────────── */
-    function _createToken(uint8 tier, uint8 curveShape) internal returns (address token, address curve) {
+    function _createToken(uint8 tier, uint8 curveShape)
+        internal
+        returns (address token, address curve)
+    {
         return _createTokenAs(creator, tier, curveShape);
     }
 

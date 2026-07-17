@@ -29,7 +29,9 @@ interface IMoonBurner {
     /// @notice Buyback $MOON with `quoteAmount` of `quoteAsset` and burn the bought $MOON.
     /// @dev Wrapped in try/catch on the internal _executeSwap self-call. Emits BuybackSkipped on failure.
     /// @return moonBurned The amount of $MOON burned.
-    function buybackAndBurn(address quoteAsset, uint256 quoteAmount) external returns (uint256 moonBurned);
+    function buybackAndBurn(address quoteAsset, uint256 quoteAmount)
+        external
+        returns (uint256 moonBurned);
 
     /* ─────────────────────────  Getters  ──────────────────────── */
 

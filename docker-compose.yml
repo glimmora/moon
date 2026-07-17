@@ -24,6 +24,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
     environment:
       NODE_ENV: production
       BACKEND_PORT: 4000
@@ -32,8 +38,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
     ports:
       - "4000:4000"
-    # Apply schema on boot, then start the server.
-    command: sh -c "npx prisma db push --skip-generate && node dist/index.js"
+    # Apply pending migrations on boot, then start the server.
+    command: sh -c "npx prisma migrate deploy && node dist/index.js"
 
   frontend:
     build:
@@ -41,6 +47,7 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+        VITE_WALLETCONNECT_PROJECT_ID: ${VITE_WALLETCONNECT_PROJECT_ID:-}
     restart: unless-stopped
     depends_on:
       - backend

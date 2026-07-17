@@ -2,6 +2,7 @@ import { createConfig, http, fallback } from "wagmi";
 import { getDefaultWallets, darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import type { Chain } from "wagmi/chains";
 import { moonChains } from "./chains";
+import { e2eConnectors } from "./e2eConnector";
 
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? "moon-fun-demo";
 
@@ -23,9 +24,13 @@ const { connectors } = getDefaultWallets({
 
 const typedChains = moonChains as unknown as readonly [Chain, ...Chain[]];
 
+// In E2E mode, prepend a local private-key connector so Playwright can sign and
+// broadcast without a browser wallet. Returns [] (no-op) in normal builds.
+const allConnectors = [...e2eConnectors(), ...connectors];
+
 export const wagmiConfig = createConfig({
   chains: typedChains,
-  connectors,
+  connectors: allConnectors,
   transports: Object.fromEntries(
     // Wrap every chain's RPC list in a fallback transport so a single flaky or
     // rate-limited endpoint automatically rolls over to the next one.

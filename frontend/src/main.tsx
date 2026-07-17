@@ -11,6 +11,7 @@ import { NetworkModeProvider } from "@/stores/networkMode";
 import { ThemeProvider, useTheme } from "@/stores/theme";
 import { ToastProvider } from "@/stores/toast";
 import { WalletEventsWatcher } from "@/components/WalletEventsWatcher";
+import { E2EAutoConnect } from "@/components/E2EAutoConnect";
 
 import "@rainbow-me/rainbowkit/styles.css";
 import "./index.css";
@@ -71,6 +72,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <NetworkModeProvider>
                   <BrowserRouter>
                     <WalletEventsWatcher />
+                    <E2EAutoConnect />
                     <App />
                   </BrowserRouter>
                 </NetworkModeProvider>

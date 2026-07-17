@@ -37,6 +37,11 @@ contracts/lib/
 *.swp
 *.swo
 
+# ─── Playwright E2E artifacts ───────────────────────────
+playwright-report/
+test-results/
+*.playwright/
+
 # ─── Logs ────────────────────────────────────────────────
 *.log
 npm-debug.log*
