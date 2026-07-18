@@ -1,0 +1,249 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: Backend + Frontend
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: test-secret-test-secret-test-secret-123456
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/moonfun_test
+      NODE_ENV: test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: moonfun_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @moon.fun/backend run db:generate
+
+      - name: Push database schema
+        run: pnpm --filter @moon.fun/backend exec prisma db push --force-reset
+
+      - name: Typecheck
+        run: pnpm run -r typecheck
+
+      - name: Lint
+        run: pnpm run -r --filter '!@moon.fun/contracts' lint
+
+      - name: Test
+        run: pnpm run -r --filter '!@moon.fun/contracts' test
+
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Build
+        run: forge build
+        working-directory: contracts
+
+      - name: Test
+        run: forge test -vvv
+        working-directory: contracts
+
+      - name: Check formatting
+        run: forge fmt --check
+        working-directory: contracts
+
+      - name: Lint (solhint)
+        run: npx --yes solhint "src/**/*.sol" --config .solhint.json
+        working-directory: contracts
+
+  slither:
+    name: Slither (Security)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install Slither
+        run: pip install --user slither-analyzer solc-select
+
+      - name: Install solc
+        run: solc-select install 0.8.24 && solc-select use 0.8.24
+        working-directory: contracts
+
+      - name: Build contracts
+        run: forge build
+        working-directory: contracts
+
+      - name: Run Slither
+        run: ~/.local/bin/slither . --foundry-out-dir out --exclude-optimization
+        working-directory: contracts
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: e2e-test-secret-e2e-test-secret-1234567890
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/moonfun_test
+      NODE_ENV: test
+      ETHEREUM_SEPOLIA_RPC_URL: https://sepolia.drpc.org
+      FACTORY_ETHEREUM_SEPOLIA: "0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3"
+      VITE_E2E: "true"
+      VITE_E2E_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+      VITE_E2E_CHAIN_ID: "11155111"
+      VITE_API_URL: "http://localhost:4000"
+      VITE_RPC_ETHEREUM_SEPOLIA: "https://sepolia.drpc.org"
+      VITE_FACTORY_ETHEREUM_SEPOLIA: "0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3"
+      VITE_FEE_ROUTER_ETHEREUM_SEPOLIA: "0x95032e828144707e9754993e421c31dE986A3bb1"
+      VITE_CREATOR_FEE_VAULT_ETHEREUM_SEPOLIA: "0x3c67d2f9f3aA5B909332f2eF7a3862b58015345B"
+      VITE_REFERRAL_REGISTRY_ETHEREUM_SEPOLIA: "0xADB082E1AA4696bffDAD8aB754874d31E37e9Fe0"
+      VITE_MOON_BURNER_ETHEREUM_SEPOLIA: "0x47240bE29d50Eeb46bCCE0c227D67A34CE18682c"
+      VITE_MOON_TOKEN_ETHEREUM_SEPOLIA: "0x4E0994001515F4fe9335bbE73691750859a82835"
+      VITE_WALLETCONNECT_PROJECT_ID: "moon-fun-demo"
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: moonfun_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @moon.fun/backend run db:generate
+
+      - name: Push database schema
+        run: pnpm --filter @moon.fun/backend exec prisma db push --force-reset
+
+      - name: Start backend
+        run: |
+          cd backend
+          node --import tsx src/index.ts &
+          echo $! > /tmp/backend.pid
+        env:
+          POLL_INTERVAL_MS: "2000"
+          CONFIRMATIONS: "1"
+          REORG_REWIND_BLOCKS: "1"
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health | grep -q '"ok"'; then
+              echo "Backend is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend failed to start"
+          exit 1
+
+      - name: Wait for indexer to sync tokens
+        run: |
+          for i in $(seq 1 60); do
+            COUNT=$(curl -sf http://localhost:4000/api/tokens | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+            if [ "$COUNT" -gt "0" ]; then
+              echo "Indexed $COUNT tokens"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Indexer did not sync any tokens"
+          exit 1
+
+      - name: Build frontend
+        run: pnpm --filter @moon.fun/frontend run build
+
+      - name: Run Playwright tests
+        run: pnpm --filter @moon.fun/frontend exec playwright install --with-deps chromium && pnpm --filter @moon.fun/frontend run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run pnpm audit
+        run: pnpm audit --audit-level moderate || true
