@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # moon.fun — one-shot developer setup.
-# Installs Node deps, Foundry deps, spins up Postgres + Redis, pushes the schema.
+# Installs Node deps, Foundry deps, spins up Postgres, pushes the schema.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,7 +26,7 @@ else
 fi
 
 # 3. Backend infra
-echo "🐳 Starting Postgres + Redis…"
+echo "🐳 Starting Postgres…"
 (cd backend && docker compose up -d)
 
 # 4. Prisma

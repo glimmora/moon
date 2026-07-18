@@ -3,9 +3,22 @@ import { Server as IOServer } from "socket.io";
 import { logger } from "../utils/logger.js";
 import { env } from "../config/env.js";
 
+// Mirror the Express CORS allowlist (see app.ts) so Socket.io connections from
+// localhost dev ports are accepted in non-production environments.
+const ALLOWED_ORIGINS = new Set(env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean));
+const LOCALHOST = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
 export function setupSockets(server: Server) {
   const io = new IOServer(server, {
-    cors: { origin: env.CORS_ORIGIN.split(",").map((s) => s.trim()), methods: ["GET", "POST"] },
+    cors: {
+      origin: (origin: string | undefined, cb: (err: Error | null, ok?: boolean) => void) => {
+        if (!origin) return cb(null, true);
+        if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
+        if (env.NODE_ENV !== "production" && LOCALHOST.test(origin)) return cb(null, true);
+        cb(new Error(`Origin ${origin} not allowed by CORS`));
+      },
+      methods: ["GET", "POST"],
+    },
     path: "/socket.io",
   });
 

@@ -44,10 +44,6 @@ contract MoonFactory is AccessControl, IMoonFactory {
 
     /// @dev Emitted when an infra role grant fails (non-blocking try/catch).
     event RoleGrantFailed(string role, address curve);
-    /// @dev Emitted when the $MOON token address is updated.
-    event MoonTokenUpdated(address indexed oldToken, address indexed newToken);
-    /// @dev Emitted when the DEX router used at graduation is updated.
-    event DexRouterUpdated(address indexed oldRouter, address indexed newRouter);
 
     /* ───────────────────────  Storage  ────────────────────────── */
 
@@ -295,6 +291,13 @@ contract MoonFactory is AccessControl, IMoonFactory {
     function setDexRouter(address dexRouter_) external onlyRole(ADMIN_ROLE) {
         emit DexRouterUpdated(dexRouter, dexRouter_);
         dexRouter = dexRouter_;
+    }
+
+    /// @notice Update the V3 concentrator address (currently a safe stub). address(0) disables
+    ///         concentration for tokens created after this call.
+    function setV3Concentrator(address v3Concentrator_) external onlyRole(ADMIN_ROLE) {
+        emit V3ConcentratorUpdated(v3Concentrator, v3Concentrator_);
+        v3Concentrator = v3Concentrator_;
     }
 
     /* ───────────────────────  Getters  ────────────────────────── */

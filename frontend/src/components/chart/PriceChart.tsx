@@ -26,7 +26,9 @@ export function PriceChart({ chainId, tokenAddress }: PriceChartProps) {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const chart = createChart(containerRef.current, {
+    let chart: IChartApi;
+    try {
+      chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
       height: 320,
       layout: {
@@ -50,6 +52,9 @@ export function PriceChart({ chainId, tokenAddress }: PriceChartProps) {
         horzLine: { color: "rgba(168, 85, 247, 0.3)", width: 1, style: 2, labelBackgroundColor: "#a855f7" },
       },
     });
+    } catch {
+      return; // DOM node detached before mount — silently skip
+    }
 
     const series = chart.addAreaSeries({
       lineColor: "#a855f7",
@@ -64,8 +69,6 @@ export function PriceChart({ chainId, tokenAddress }: PriceChartProps) {
     chartRef.current = chart;
     seriesRef.current = series;
 
-    // Track the container's actual size (handles sidebar toggles / layout shifts,
-    // not just window resizes) so the chart never overflows or leaves gaps.
     const ro = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width;
       if (width && chartRef.current) {

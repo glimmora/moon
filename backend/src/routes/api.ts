@@ -64,7 +64,7 @@ apiRouter.get("/tokens/:chainId/:address/trades", async (req, res, next) => {
     const address = parseAddress(req.params.address, res);
     if (!address) return;
     const rawLimit = req.query.limit ? Number(req.query.limit) : 50;
-    const limit = Number.isNaN(rawLimit) ? 50 : Math.min(rawLimit, 200);
+    const limit = Number.isNaN(rawLimit) ? 50 : Math.max(1, Math.min(rawLimit, 200));
     const trades = await tradeService.list(chainId, address, limit);
     res.json(trades);
   } catch (e) {

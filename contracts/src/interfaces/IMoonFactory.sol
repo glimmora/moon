@@ -56,6 +56,9 @@ interface IMoonFactory {
     event FeeRouterUpdated(address indexed oldFeeRouter, address indexed newFeeRouter);
     event CreatorFeeVaultUpdated(address indexed oldVault, address indexed newVault);
     event ReferralRegistryUpdated(address indexed oldRegistry, address indexed newRegistry);
+    event DexRouterUpdated(address indexed oldRouter, address indexed newRouter);
+    event MoonTokenUpdated(address indexed oldToken, address indexed newToken);
+    event V3ConcentratorUpdated(address indexed oldConc, address indexed newConc);
 
     /* ─────────────────────────  Create  ───────────────────────── */
 
@@ -97,4 +100,7 @@ interface IMoonFactory {
     function setFeeRouter(address feeRouter_) external;
     function setCreatorFeeVault(address creatorFeeVault_) external;
     function setReferralRegistry(address referralRegistry_) external;
+    function setDexRouter(address dexRouter_) external;
+    function setMoonToken(address moonToken_) external;
+    function setV3Concentrator(address v3Concentrator_) external;
 }

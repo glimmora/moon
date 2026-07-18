@@ -11,7 +11,7 @@ if [ -z "${PRIV_KEY2:-}" ]; then echo "FATAL: PRIV_KEY2 env var required"; exit 
 PK="$PRIV_KEY"
 PK2="$PRIV_KEY2"
 DEPLOYER="0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24"
-ATTACKER="0xe764df96eE2636Eb1e0ecb2D6449f776b3BfB129"
+ATTACKER="0x7587663db23a8E144B3508921c2BA9D0676AE03D"
 GAS="2000000000"
 ZERO="0x0000000000000000000000000000000000000000"
 
@@ -19,7 +19,7 @@ FACTORY="0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3"
 FEEROUTER="0x95032e828144707e9754993e421c31dE986A3bb1"
 VAULT="0x3c67d2f9f3aA5B909332f2eF7a3862b58015345B"
 REGISTRY="0xADB082E1AA4696bffDAD8aB754874d31E37e9Fe0"
-MOONBURNER="0xaca899314bd11E103779CA0a790C9b33c2b8FebA"
+MOONBURNER="0x47240bE29d50Eeb46bCCE0c227D67A34CE18682c"
 TOKEN0="0xed57e0de0e84c4af751d7f30c45bb22ec587b34f"
 CURVE0="0x466d8a659e2b4b234de4a518e190c4d7f6b9ed90"
 
@@ -31,7 +31,7 @@ log_revert() { echo "🛡️  REVERT (expected) — $1"; REVERT=$((REVERT+1)); }
 # expect_success: tx status == 1
 es() {
   local desc="$1" result="$2"
-  if echo "$result" | grep -q '"status": 1'; then
+  if echo "$result" | grep -qE 'status\s+1 \(success\)'; then
     log_pass "$desc"
   else
     log_fail "$desc"
@@ -43,7 +43,7 @@ er() {
   local desc="$1" result="$2"
   if echo "$result" | grep -qiE 'revert|execution reverted|failed to estimate|insufficient|unauthorized|panic'; then
     log_revert "$desc"
-  elif echo "$result" | grep -q '"status": 1'; then
+  elif echo "$result" | grep -qE 'status\s+1 \(success\)'; then
     log_fail "$desc (should have reverted but SUCCEEDED!)"
   else
     log_revert "$desc"
@@ -83,13 +83,14 @@ es "buy 0.005 ETH" "$R"
 
 echo "1.5: Sell 50% balance"
 BAL=$(cast call "$TOKEN0" "balanceOf(address)(uint256)" "$DEPLOYER" --rpc-url "$RPC" 2>&1 | awk '{print $1}' | tr -d ' ')
-SELL_AMT=$((BAL / 2))
+SELL_AMT=$(python3 -c "print(int('$BAL') // 2)")
 R=$(cast send "$CURVE0" "sell(uint256,uint256,address)" "$SELL_AMT" 0 "$ZERO" \
   --rpc-url "$RPC" --private-key "$PK" --gas-price "$GAS" --gas-limit 1500000 2>&1)
 es "sell 50% balance" "$R"
 
 echo "1.6: Register referral code"
-R=$(cast send "$REGISTRY" "registerCode(bytes32)" 0x5345435f52454645525245525f434f4445000000000000000000000000000000 \
+REF_CODE=$(python3 -c "print('0x' + format(int(__import__('time').time()) & 0xffffffffffffffff, '064x'))")
+R=$(cast send "$REGISTRY" "registerCode(bytes32)" "$REF_CODE" \
   --rpc-url "$RPC" --private-key "$PK" --gas-price "$GAS" --gas-limit 200000 2>&1)
 es "registerCode" "$R"
 
@@ -211,7 +212,7 @@ R=$(cast send "$REGISTRY" "setReferrer(address)" "$ATTACKER" \
 er "double setReferrer" "$R"
 
 echo "4.2: Register duplicate code"
-R=$(cast send "$REGISTRY" "registerCode(bytes32)" 0x5345435f52454645525245525f434f4445000000000000000000000000000000 \
+R=$(cast send "$REGISTRY" "registerCode(bytes32)" "$REF_CODE" \
   --rpc-url "$RPC" --private-key "$PK2" --gas-price "$GAS" --gas-limit 200000 2>&1)
 er "register duplicate code" "$R"
 
@@ -228,7 +229,7 @@ echo "── SECTION 6: TOKEN LIMITS ──"
 
 echo "6.1: Self-burn (permissionless, M-1 fix)"
 BAL=$(cast call "$TOKEN0" "balanceOf(address)(uint256)" "$DEPLOYER" --rpc-url "$RPC" 2>&1 | awk '{print $1}' | tr -d ' ')
-BURN_AMT=$((BAL / 10))
+BURN_AMT=$(python3 -c "print(int('$BAL') // 10)")
 R=$(cast send "$TOKEN0" "burn(uint256)" "$BURN_AMT" \
   --rpc-url "$RPC" --private-key "$PK" --gas-price "$GAS" --gas-limit 200000 2>&1)
 es "self-burn 10%" "$R"

@@ -55,15 +55,15 @@ export const tokenService = {
 
   async markGraduated(chainId: number, address: string, dexPair: string) {
     logger.info({ chainId, address, dexPair }, "Marking token graduated");
-    return prisma.token.update({
-      where: { chainId_address: { chainId, address } },
+    return prisma.token.updateMany({
+      where: { chainId, address },
       data: { graduated: true, dexPair },
     });
   },
 
   async updateMarketStats(chainId: number, address: string, stats: { priceUsd?: number; marketCapUsd?: number; holderCount?: number; volume24h?: number }) {
-    return prisma.token.update({
-      where: { chainId_address: { chainId, address } },
+    return prisma.token.updateMany({
+      where: { chainId, address },
       data: stats,
     });
   },

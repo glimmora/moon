@@ -59,18 +59,21 @@ export function useTokens(opts?: { sort?: string; chainId?: number; includeGradu
   return useQuery<TokenListItem[]>({
     queryKey: ["tokens-v3", chainId, isOnline],
     queryFn: async () => {
-      // Try backend first
+      let backendErrored = false;
       if (isOnline) {
         try {
           const tokens = await api.getTokens(chainId);
           if (tokens && tokens.length > 0) return tokens;
         } catch {
-          // fall through
+          backendErrored = true;
         }
       }
 
-      // On-chain fallback
-      return await fetchTokensOnChain(chainId);
+      const onChainTokens = await fetchTokensOnChain(chainId);
+      if (onChainTokens.length === 0 && backendErrored) {
+        throw new Error("Unable to fetch tokens — backend and on-chain fallback both failed.");
+      }
+      return onChainTokens;
     },
     refetchInterval: 15_000,
     retry: 1,
@@ -152,7 +155,7 @@ async function fetchTokensOnChain(filterChainId?: number): Promise<TokenListItem
 
       // 3. Fallback: read allTokens(i) + fetch metadata per token
       if (!eventSuccess) {
-        const maxRead = Math.min(Number(length), 20);
+        const maxRead = Math.min(Number(length), 50);
         const tokenAddresses: string[] = [];
         for (let i = Number(length) - 1; i >= Math.max(0, Number(length) - maxRead); i--) {
           try {

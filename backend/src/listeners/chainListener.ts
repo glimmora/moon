@@ -99,10 +99,12 @@ export async function startChainListener(chain: ChainConfig, io?: MoonIO): Promi
 
       await pollFactoryEvents(client, chain, fromBlock, toBlock);
       await pollCurveEvents(client, chain, fromBlock, toBlock, io);
-      // Referral/fee accumulators are additive (not idempotent upserts), so they
-      // must only see blocks strictly newer than the last committed checkpoint —
-      // never the reorg-rewind window (which would double-count).
-      const feeFrom = state.lastBlock + 1n;
+      // Referral/fee accumulators use an in-memory dedup set to prevent
+      // double-counting within a small safety overlap (CONFIRMATIONS blocks),
+      // so they can also scan the reorg-rewind window like factory/curve events.
+      // This catches crash-gap events that would otherwise be permanently lost.
+      const feeRewind = BigInt(env.CONFIRMATIONS);
+      const feeFrom = state.lastBlock + 1n > feeRewind ? state.lastBlock + 1n - feeRewind : 1n;
       if (toBlock >= feeFrom) {
         await pollReferralAndFeeEvents(client, chain, feeFrom, toBlock, state);
       }
@@ -289,6 +291,11 @@ async function pollReferralAndFeeEvents(
   toBlock: bigint,
   state: IndexerState,
 ): Promise<void> {
+  // In-memory cache of recently processed event positions to guard against
+  // double-counting when the same block range is polled again after a crash
+  // (checkpoint saved AFTER processing). Key: "chainId:txHash:logIndex".
+  const processed = new Set<string>();
+
   // Referral rewards — accumulate per referrer.
   if (state.referralRegistry) {
     const events = referralRegistryAbi.filter(
@@ -303,6 +310,10 @@ async function pollReferralAndFeeEvents(
     const parsed = parseEventLogs({ abi: referralRegistryAbi, logs: logs as Log[] });
     for (const log of parsed) {
       if (log.eventName !== "ReferralRecorded") continue;
+      const key = `${chain.chainId}:${log.transactionHash ?? "0x0"}:${log.logIndex ?? 0}`;
+      if (processed.has(key)) continue;
+      processed.add(key);
+
       const args = log.args as unknown as {
         referrer: string;
         tradeVolume: bigint;
@@ -332,6 +343,10 @@ async function pollReferralAndFeeEvents(
     const parsed = parseEventLogs({ abi: creatorFeeVaultAbi, logs: logs as Log[] });
     for (const log of parsed) {
       if (log.eventName !== "FeesAccrued") continue;
+      const key = `${chain.chainId}:${log.transactionHash ?? "0x0"}:${log.logIndex ?? 0}`;
+      if (processed.has(key)) continue;
+      processed.add(key);
+
       const args = log.args as unknown as {
         creator: string;
         quoteAsset: string;

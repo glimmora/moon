@@ -45,7 +45,7 @@ export function useCreateToken(chainId: number) {
   const create = useCallback(
     async (form: CreateTokenForm) => {
       if (!contracts?.factory || contracts.factory === ZERO) {
-        return null;
+        throw new Error("Factory contract not found on this network.");
       }
       const createArgs = {
         name: form.name,

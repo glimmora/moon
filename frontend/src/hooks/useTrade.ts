@@ -37,21 +37,15 @@ export function useTrade({ chainId, curveAddress }: UseTradeArgs) {
     async (quoteAmountIn: string, minTokensOut: bigint, referrer?: Address) => {
       const trimmed = quoteAmountIn.trim();
       if (!trimmed || !/^\d*\.?\d+$/.test(trimmed)) {
-        return tx.execute({
-          abi: bondingCurveAbi,
-          address: curveAddress,
-          functionName: "buy",
-          args: [0n, minTokensOut, referrer ?? ZERO],
-          value: 0n,
-        }).then(() => null);
+        throw new Error("Invalid amount format. Enter a number (e.g. 0.1).");
       }
       let value: bigint;
       try {
         value = parseEther(trimmed);
       } catch {
-        return null;
+        throw new Error("Amount is too small or invalid.");
       }
-      if (value <= 0n) return null;
+      if (value <= 0n) throw new Error("Amount must be greater than 0.");
       return tx.execute({
         abi: bondingCurveAbi,
         address: curveAddress,
@@ -65,7 +59,7 @@ export function useTrade({ chainId, curveAddress }: UseTradeArgs) {
 
   const sell = useCallback(
     async (tokenAmountIn: bigint, minQuoteOut: bigint, referrer?: Address) => {
-      if (tokenAmountIn <= 0n) return null;
+      if (tokenAmountIn <= 0n) throw new Error("Amount must be greater than 0.");
       return tx.execute({
         abi: bondingCurveAbi,
         address: curveAddress,

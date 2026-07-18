@@ -1,4 +1,4 @@
-import { createConfig, http, fallback } from "wagmi";
+import { createConfig, http, fallback, createStorage } from "wagmi";
 import { getDefaultWallets, darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import type { Chain } from "wagmi/chains";
 import { moonChains } from "./chains";
@@ -32,11 +32,11 @@ export const wagmiConfig = createConfig({
   chains: typedChains,
   connectors: allConnectors,
   transports: Object.fromEntries(
-    // Wrap every chain's RPC list in a fallback transport so a single flaky or
-    // rate-limited endpoint automatically rolls over to the next one.
     moonChains.map((c) => [c.id, fallback(c.rpcUrls.default.http.map((url) => http(url)))]),
   ),
   ssr: false,
+  storage: createStorage({ storage: localStorage, key: "moon.fun.wagmi" }),
+  multiInjectedProviderDiscovery: true,
 });
 
 export { darkTheme, RainbowKitProvider };

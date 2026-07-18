@@ -84,7 +84,10 @@ async function refreshHolders(
 
   const checkpointId = `holders-${chain.chainId}-${tokenAddress.toLowerCase()}`;
   const checkpoint = await prisma.indexerCheckpoint.findUnique({ where: { id: checkpointId } });
-  const head = await client.getBlockNumber().catch(() => 0n);
+  const head = await client.getBlockNumber().catch((err) => {
+    logger.warn({ chainId: chain.chainId, tokenAddress, err }, "RPC getBlockNumber failed — skipping holder refresh");
+    return 0n;
+  });
   if (head === 0n) return;
 
   // Confirmation lag so holder balances don't reflect reorg-able blocks.
@@ -195,8 +198,8 @@ async function refreshHolders(
 
   // Recompute accurate holder count (all non-zero rows for this token).
   const holderCount = await prisma.holder.count({ where: { chainId: chain.chainId, tokenAddress } });
-  await tokenService.updateMarketStats(chain.chainId, tokenAddress, { holderCount }).catch(() => {
-    /* token row may not exist yet if factory hasn't indexed it — ignore */
+  await tokenService.updateMarketStats(chain.chainId, tokenAddress, { holderCount }).catch((err) => {
+    logger.warn({ chainId: chain.chainId, tokenAddress, err }, "updateMarketStats failed — token row may not exist yet");
   });
 
   // Advance the checkpoint only after a fully successful pass.

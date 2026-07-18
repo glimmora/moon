@@ -44,7 +44,7 @@ export function Create() {
     setForm((f) => ({ ...f, [key]: value }));
   };
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const invalid = validateCreateForm(form);
     if (invalid) {
@@ -56,7 +56,12 @@ export function Create() {
       return;
     }
     setValidationError(null);
-    create(form);
+    try {
+      await create(form);
+      setForm(DEFAULTS);
+    } catch (e) {
+      setValidationError(e instanceof Error ? e.message : "Launch failed.");
+    }
   }
 
   const activeChain = chainMeta[chainId];

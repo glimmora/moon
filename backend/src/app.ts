@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
+import pinoHttp from "pino-http";
 import { env } from "./config/env.js";
 import { logger } from "./utils/logger.js";
 import { apiRouter } from "./routes/api.js";
@@ -35,6 +36,7 @@ export function createApp(): express.Express {
   const app = express();
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(compression());
+  app.use(pinoHttp({ logger }));
   app.set("trust proxy", 1);
   app.use(cors({ origin: corsOrigin }));
   app.use(express.json({ limit: "100kb" }));

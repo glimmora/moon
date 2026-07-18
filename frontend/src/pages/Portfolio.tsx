@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import { Link } from "react-router-dom";
+import { isAddress } from "viem";
 import {
   Wallet,
   TrendingUp,
@@ -14,6 +15,7 @@ import {
   ExternalLink,
   Rocket,
   Activity,
+  AlertCircle,
 } from "lucide-react";
 import { formatUsd, shortenAddress, formatToken, timeAgo, formatMarketCap } from "@/lib/format";
 import { chainMeta } from "@/config/chains";
@@ -25,6 +27,10 @@ export function Portfolio() {
   const params = useParams<{ address: string }>();
   const { address: walletAddress } = useAccount();
   const address = params.address ? params.address.toLowerCase() : walletAddress;
+
+  // Validate explicit address parameter.
+  const invalidAddress = Boolean(params.address && address && !isAddress(address));
+
   const [showAllPositions, setShowAllPositions] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -42,6 +48,18 @@ export function Portfolio() {
         </div>
         <h1 className="text-3xl font-bold font-display">Your Portfolio</h1>
         <p className="mt-2 text-neutral-400">Connect your wallet to view positions, P&L, and trade history.</p>
+      </div>
+    );
+  }
+
+  if (invalidAddress) {
+    return (
+      <div className="py-16 text-center animate-fade-in-up">
+        <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/10 border border-red-500/20 mb-4">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+        </div>
+        <h1 className="text-3xl font-bold font-display">Invalid Address</h1>
+        <p className="mt-2 text-neutral-400">The address you entered is not a valid Ethereum address.</p>
       </div>
     );
   }

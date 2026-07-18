@@ -10,7 +10,7 @@ import { formatToken, formatPrice, shortenAddress } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { chainMeta } from "@/config/chains";
 import { TxProgress } from "@/components/tx/TxProgress";
-import { ArrowDownToLine, ArrowUpFromLine, Loader2, AlertCircle, Settings2 } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Loader2, AlertCircle, AlertTriangle, Settings2 } from "lucide-react";
 
 interface TradePanelProps {
   chainId: number;
@@ -234,6 +234,14 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
           <div className="h-px bg-white/[0.04] my-1" />
           <Row label="Min received" value={quote.minOutLabel} muted />
           <Row label="Slippage" value={`${slippage}%`} muted />
+        </div>
+      )}
+
+      {/* Curve read error */}
+      {reads.isError && (
+        <div className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-300 animate-fade-in">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>Failed to load curve state. The RPC may be unavailable.</span>
         </div>
       )}
 

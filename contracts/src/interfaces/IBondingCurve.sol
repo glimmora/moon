@@ -73,6 +73,10 @@ interface IBondingCurve {
     /// @notice Graduate the token to DEX trading once threshold reached.
     function graduate() external;
 
+    /// @notice One-shot factory setter called by the factory before __init(). Only callable
+    /// when initialized (s_factory == address(0)), and only once.
+    function setFactory() external;
+
     /* ─────────────────────────  Getters  ──────────────────────── */
 
     function token() external view returns (address);

@@ -31,7 +31,11 @@ export default defineConfig({
     video: "retain-on-failure",
     actionTimeout: 15_000,
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+  ],
   webServer: {
     // Preview a production build so import.meta.env is baked with E2E flags.
     command: `npx vite build && npx vite preview --port ${PORT} --strictPort --host 127.0.0.1`,

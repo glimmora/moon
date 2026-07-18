@@ -16,6 +16,19 @@ interface TokenCardProps {
   defaultWatched?: boolean;
 }
 
+function tokenCardAreEqual(prev: TokenCardProps, next: TokenCardProps) {
+  return (
+    prev.token.address === next.token.address &&
+    prev.token.chainId === next.token.chainId &&
+    prev.token.priceUsd === next.token.priceUsd &&
+    prev.token.volume24h === next.token.volume24h &&
+    prev.token.holderCount === next.token.holderCount &&
+    prev.token.marketCapUsd === next.token.marketCapUsd &&
+    prev.token.graduated === next.token.graduated &&
+    prev.defaultWatched === next.defaultWatched
+  );
+}
+
 export const TokenCard = memo(function TokenCard({ token, defaultWatched = false }: TokenCardProps) {
   const { address } = useAccount();
   const queryClient = useQueryClient();
@@ -146,4 +159,4 @@ export const TokenCard = memo(function TokenCard({ token, defaultWatched = false
       </div>
     </div>
   );
-});
+}, tokenCardAreEqual);

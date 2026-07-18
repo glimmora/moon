@@ -52,6 +52,29 @@ test.describe("read flows", () => {
     });
   });
 
+  test("token detail page renders trade panel", async ({ page }) => {
+    await gotoHome(page);
+    const firstCard = page.getByRole("link", { name: /details$/i }).first();
+    await expect(firstCard).toBeVisible({ timeout: 20_000 });
+    await firstCard.click();
+    await expect(page).toHaveURL(/\/token\/\d+\/0x[0-9a-fA-F]{40}/);
+
+    // Trade panel is present with Buy/Sell tabs.
+    const tradePanel = page.getByRole("heading", { name: /Trade/i });
+    await expect(tradePanel).toBeVisible({ timeout: 20_000 });
+    await page.waitForLoadState("networkidle");
+
+    // Buy tab is active by default (text is lowercase "buy").
+    await expect(page.getByRole("button", { name: "buy", exact: true })).toBeVisible({ timeout: 20_000 });
+
+    // Sell tab exists and can be clicked.
+    await page.getByRole("button", { name: "sell", exact: true }).click();
+
+    // Slippage settings toggle.
+    await page.getByRole("button", { name: /Trade settings/i }).click();
+    await expect(page.getByText(/Slippage Tolerance/i)).toBeVisible();
+  });
+
   test("unknown route renders NotFound", async ({ page }) => {
     await page.goto("/this-route-does-not-exist");
     await expect(page.getByText(/404|not found/i).first()).toBeVisible();

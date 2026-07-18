@@ -64,6 +64,9 @@ interface IReferralRegistry {
     /// @notice Pull-payment claim of referral rewards for one quote asset.
     function claimRewards(address quoteAsset) external returns (uint256 amount);
 
+    /// @notice Batch-claim referral rewards across all quote assets for the caller.
+    function claimAllRewards() external returns (uint256 total);
+
     /* ─────────────────────────  Getters  ──────────────────────── */
 
     function referrerOf(address trader) external view returns (address);

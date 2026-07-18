@@ -157,22 +157,13 @@ npm run dev
 
 ### Database configuration
 
-The backend supports both PostgreSQL (production) and SQLite (local dev):
+The backend uses PostgreSQL (required for production and local dev):
 
-**PostgreSQL:**
 ```env
-DATABASE_PROVIDER=postgresql
 DATABASE_URL=postgresql://moon:moon@localhost:5432/moonfun
 ```
 
-**SQLite (fallback):**
-```env
-DATABASE_PROVIDER=sqlite
-DATABASE_URL=file:./dev.db
-```
-
-Note: Prisma schema has `provider = "postgresql"` hardcoded (Prisma doesn't allow `env()`
-for provider). The `dev.sh` script auto-swaps to `sqlite` via sed if needed, then restores.
+The Prisma schema has `provider = "postgresql"` hardcoded. PostgreSQL 16+ is required.
 
 ## 10. Upgrades
 

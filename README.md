@@ -56,9 +56,9 @@ See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full system design.
 moon.fun/
 ├── contracts/      # Foundry project — Solidity 0.8.24 + OpenZeppelin v5
 ├── frontend/       # Vite 5 + React 18 + wagmi 2 + RainbowKit 2 + Tailwind 3
-├── backend/        # Node 20 + Express + Socket.io + Prisma + Postgres/SQLite
+├── backend/        # Node 20 + Express + Socket.io + Prisma + Postgres
 ├── docs/           # Architecture, security, deployment, audit, API, contributing
-├── scripts/        # dev.sh (launcher), audit.sh, deploy-all.sh, security-test-sepolia.sh
+├── scripts/        # dev.sh, setup-dev.sh, audit.sh, deploy-all.sh, security-test-sepolia.sh, e2e-launch.mjs
 └── .github/        # CI workflow
 ```
 
@@ -70,7 +70,7 @@ moon.fun/
 
 - [Node.js 20](https://nodejs.org/)
 - [Foundry](https://book.getfoundry.sh/getting-started/installation) (`foundryup`) — for smart contract tests
-- [PostgreSQL](https://www.postgresql.org/) (optional — falls back to SQLite automatically)
+- [PostgreSQL](https://www.postgresql.org/) 16+ (required)
 
 ### One-command dev launcher
 
@@ -82,7 +82,7 @@ cd moon.fun
 
 This will:
 - Install frontend + backend dependencies (if missing)
-- Auto-detect Postgres (falls back to SQLite if not running)
+- Auto-detect Postgres (errors with a helpful hint if not running)
 - Generate Prisma client + push schema
 - Start backend on port `4000`
 - Start frontend on port `5173`
@@ -110,7 +110,7 @@ forge test -vvv
 # 2. Backend
 cd backend
 cp .env.example .env
-# Edit .env — set DATABASE_PROVIDER=postgresql or sqlite
+# Edit .env — set DATABASE_URL to your Postgres connection
 npm install
 npx prisma generate
 npx prisma db push

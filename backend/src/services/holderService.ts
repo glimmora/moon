@@ -29,14 +29,14 @@ export const holderService = {
   },
 
   async list(chainId: number, tokenAddress: string, limit = 100) {
-    // Sort by numeric balance using raw ORDER BY — String sort is lexicographic ("9" > "100").
-    const rows = await prisma.$queryRawUnsafe(
-      `SELECT * FROM "Holder"
-       WHERE "chainId" = $1 AND "tokenAddress" = $2
-       ORDER BY CAST("balance" AS NUMERIC) DESC
-       LIMIT $3`,
-      chainId, tokenAddress, limit,
-    ) as { id: string; chainId: number; tokenAddress: string; address: string; balance: string; percentage: number; isContract: boolean; firstSeen: Date; updatedAt: Date }[];
+    const rows = await prisma.$queryRaw<
+      { id: string; chainId: number; tokenAddress: string; address: string; balance: string; percentage: number; isContract: boolean; firstSeen: Date; updatedAt: Date }[]
+    >`
+      SELECT * FROM "Holder"
+      WHERE "chainId" = ${chainId} AND "tokenAddress" = ${tokenAddress}
+      ORDER BY CAST("balance" AS NUMERIC) DESC
+      LIMIT ${limit}
+    `;
     return rows;
   },
 
