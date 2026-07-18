@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Rocket, Trophy, Plus, Star, Wallet } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useTheme } from "@/stores/theme";
 
 const NAV = [
   { to: "/", label: "Explore", icon: Rocket },
@@ -12,6 +13,8 @@ const NAV = [
 
 export function MobileNav() {
   const { pathname } = useLocation();
+  const { theme } = useTheme();
+  const isLight = theme === "light";
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 safe-x safe-bottom px-3 pb-3 pt-2 pointer-events-none" aria-label="Primary">
@@ -28,15 +31,17 @@ export function MobileNav() {
                     aria-current={active ? "page" : undefined}
                     aria-label={item.label}
                     className={cn(
-                      "flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-all duration-250 ease-smooth",
-                      active ? "text-moon-400" : "text-neutral-500 hover:text-neutral-300",
+                      "flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-all duration-250 ease-smooth active:scale-95",
+                      active
+                        ? "text-moon-500 dark:text-moon-400"
+                        : isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-500 hover:text-neutral-300",
                     )}
                   >
                     <div
                       className={cn(
                         "flex h-7 w-7 items-center justify-center rounded-lg transition-all duration-300 ease-smooth",
                         active && item.primary && "bg-gradient-to-br from-moon-500 to-moon-700 text-white shadow-glow scale-110",
-                        active && !item.primary && "bg-white/[0.08] scale-105",
+                        active && !item.primary && (isLight ? "bg-moon-500/15 scale-105" : "bg-white/[0.08] scale-105"),
                       )}
                     >
                       <Icon className="h-4 w-4" />

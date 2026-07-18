@@ -9,6 +9,7 @@ import { useAccount } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import { toggleWatchlist } from "@/hooks/useTokens";
 import { useToast } from "@/stores/toast";
+import { useTheme } from "@/stores/theme";
 import { LaunchCountdown } from "./LaunchCountdown";
 
 interface TokenCardProps {
@@ -33,6 +34,8 @@ export const TokenCard = memo(function TokenCard({ token, defaultWatched = false
   const { address } = useAccount();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { theme } = useTheme();
+  const isLight = theme === "light";
   const [watched, setWatched] = useState(defaultWatched);
   const watchId = `${token.chainId}-${token.address}`;
   const meta = chainMeta[token.chainId];
@@ -75,7 +78,10 @@ export const TokenCard = memo(function TokenCard({ token, defaultWatched = false
         {/* Avatar with ring */}
         <div className="relative shrink-0">
           <div className="absolute inset-0 rounded-full bg-moon-gradient opacity-30 blur-md group-hover:opacity-50 transition-opacity" />
-          <div className="relative h-12 w-12 overflow-hidden rounded-full border border-white/[0.08] bg-ink-900">
+          <div className={cn(
+            "relative h-12 w-12 overflow-hidden rounded-full border bg-ink-900",
+            isLight ? "border-neutral-200" : "border-white/[0.08]",
+          )}>
             {token.imageUrl ? (
               <img
                 src={token.imageUrl}
@@ -93,7 +99,7 @@ export const TokenCard = memo(function TokenCard({ token, defaultWatched = false
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <h3 className="truncate font-semibold text-neutral-100">{token.name}</h3>
+            <h3 className={cn("truncate font-semibold", isLight ? "text-neutral-900" : "text-neutral-100")}>{token.name}</h3>
             <span className="chip-neutral">${token.symbol}</span>
             {token.graduated && (
               <span className="chip-moon">
@@ -101,11 +107,11 @@ export const TokenCard = memo(function TokenCard({ token, defaultWatched = false
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-xs text-neutral-500 flex items-center gap-1">
+          <p className={cn("mt-0.5 text-xs flex items-center gap-1", isLight ? "text-neutral-500" : "text-neutral-500")}>
             <span>{meta?.shortLabel ?? `#${token.chainId}`}</span>
-            <span className="text-neutral-700">·</span>
+            <span className={isLight ? "text-neutral-300" : "text-neutral-700"}>·</span>
             <span className="font-mono">{shortenAddress(token.creator)}</span>
-            <span className="text-neutral-700">·</span>
+            <span className={isLight ? "text-neutral-300" : "text-neutral-700"}>·</span>
             <span>{timeAgo(token.createdAt)}</span>
           </p>
         </div>
@@ -115,12 +121,18 @@ export const TokenCard = memo(function TokenCard({ token, defaultWatched = false
             type="button"
             onClick={handleToggleWatch}
             aria-pressed={watched}
-            className="pointer-events-auto rounded-lg p-1.5 text-neutral-500 hover:bg-white/[0.06] hover:text-amber-400 transition-colors"
+            className={cn(
+              "pointer-events-auto rounded-lg p-1.5 transition-colors",
+              isLight ? "text-neutral-400 hover:bg-neutral-200 hover:text-amber-500" : "text-neutral-500 hover:bg-white/[0.06] hover:text-amber-400",
+            )}
             aria-label={watched ? `Remove ${token.symbol} from watchlist` : `Add ${token.symbol} to watchlist`}
           >
             <Star className={cn("h-4 w-4 transition-all", watched && "fill-amber-400 text-amber-400 scale-110")} />
           </button>
-          <ArrowUpRight className="h-3.5 w-3.5 text-neutral-600 group-hover:text-moon-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+          <ArrowUpRight className={cn(
+            "h-3.5 w-3.5 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5",
+            isLight ? "text-neutral-400 group-hover:text-moon-600" : "text-neutral-600 group-hover:text-moon-300",
+          )} />
         </div>
       </div>
 
@@ -128,15 +140,15 @@ export const TokenCard = memo(function TokenCard({ token, defaultWatched = false
       <div className="relative z-10 pointer-events-none mt-3 grid grid-cols-3 gap-2 text-xs">
         <div>
           <p className="text-neutral-500 text-[10px] uppercase tracking-wider">Mkt Cap</p>
-          <p className="font-semibold text-neutral-100 tabular">{formatMarketCap(token.marketCapUsd)}</p>
+          <p className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>{formatMarketCap(token.marketCapUsd)}</p>
         </div>
         <div>
           <p className="text-neutral-500 text-[10px] uppercase tracking-wider">Price</p>
-          <p className="font-semibold text-neutral-100 tabular">${token.priceUsd.toFixed(6)}</p>
+          <p className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>${token.priceUsd.toFixed(6)}</p>
         </div>
         <div>
           <p className="text-neutral-500 text-[10px] uppercase tracking-wider">24h Vol</p>
-          <p className="font-semibold text-neutral-100 tabular">{formatMarketCap(token.volume24h)}</p>
+          <p className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>{formatMarketCap(token.volume24h)}</p>
         </div>
       </div>
 
@@ -153,7 +165,10 @@ export const TokenCard = memo(function TokenCard({ token, defaultWatched = false
       </div>
 
       {/* Footer */}
-      <div className="relative z-10 pointer-events-none mt-3 flex items-center justify-between text-[11px] text-neutral-500">
+      <div className={cn(
+        "relative z-10 pointer-events-none mt-3 flex items-center justify-between text-[11px]",
+        isLight ? "text-neutral-500" : "text-neutral-500",
+      )}>
         <span className="tabular">{token.holderCount.toLocaleString()} holders</span>
         <span className="tabular">{timeAgo(token.createdAt)}</span>
       </div>

@@ -1,14 +1,15 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTokenDetail, useCurveState } from "@/hooks/useTokenDetail";
 import { useTrade } from "@/hooks/useTrade";
 import { useReferrer } from "@/hooks/useReferrer";
-import { useAccount, useReadContract, useBlockNumber } from "wagmi";
+import { useAccount, useBalance, useReadContract, useBlockNumber } from "wagmi";
 import { moonTokenAbi } from "@/abi/MoonToken";
 import { formatEther, parseEther, type Address } from "viem";
 import { getBuyOut, getSellOut, type CurveReserves, CurveShape } from "@/lib/curve";
 import { formatToken, formatPrice, shortenAddress } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { chainMeta } from "@/config/chains";
+import { useTheme } from "@/stores/theme";
 import { TxProgress } from "@/components/tx/TxProgress";
 import { ArrowDownToLine, ArrowUpFromLine, Loader2, AlertCircle, AlertTriangle, Settings2 } from "lucide-react";
 
@@ -23,6 +24,8 @@ const SLIPPAGE_PRESETS = [0.5, 1, 2, 5];
 
 export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }: TradePanelProps) {
   const { address } = useAccount();
+  const { theme } = useTheme();
+  const isLight = theme === "light";
   const { meta } = useTokenDetail(chainId, tokenAddress);
   const reads = useCurveState(chainId, curveAddress);
   const trade = useTrade({ chainId, curveAddress });
@@ -32,6 +35,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
 
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
+  const [sliderValue, setSliderValue] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [slippage, setSlippage] = useState(1);
 
@@ -43,6 +47,68 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
     chainId,
     query: { enabled: Boolean(address) && side === "sell" },
   });
+
+  const { data: nativeBalance } = useBalance({
+    address,
+    chainId,
+    query: { enabled: Boolean(address) && side === "buy" },
+  });
+
+  // The balance that the percentage slider is expressed against: the user's
+  // native (ETH) balance when buying, the token balance when selling.
+  const maxBalance: bigint | undefined = useMemo(() => {
+    if (!address) return undefined;
+    if (side === "buy") return nativeBalance?.value;
+    return tokenBalance as bigint | undefined;
+  }, [address, side, nativeBalance, tokenBalance]);
+
+  // Slider → amount: pct % of the available balance.
+  const handleSliderChange = useCallback(
+    (pct: number) => {
+      setSliderValue(pct);
+      if (!maxBalance || maxBalance <= 0n) {
+        if (pct === 0) setAmount("");
+        return;
+      }
+      const raw = (maxBalance * BigInt(pct)) / 100n;
+      setAmount(raw > 0n ? formatToken(raw) : "");
+    },
+    [maxBalance],
+  );
+
+  // Amount input → slider: position the slider to match the typed amount.
+  const handleAmountChange = useCallback(
+    (value: string) => {
+      setAmount(value);
+      if (!maxBalance || !value) {
+        setSliderValue(0);
+        return;
+      }
+      try {
+        const amt = parseEther(value);
+        if (amt > 0n && maxBalance > 0n) {
+          const pct = Number((amt * 100n) / maxBalance);
+          setSliderValue(Math.min(100, Math.max(0, pct)));
+        } else {
+          setSliderValue(0);
+        }
+      } catch {
+        setSliderValue(0);
+      }
+    },
+    [maxBalance],
+  );
+
+  const setMax = useCallback(() => {
+    if (!maxBalance) return;
+    setSliderValue(100);
+    setAmount(formatToken(maxBalance));
+  }, [maxBalance]);
+
+  // Reset the slider when switching sides, since the balance source changes.
+  useEffect(() => {
+    setSliderValue(0);
+  }, [side, address]);
 
   const reserves: CurveReserves | undefined = useMemo(() => {
     if (!reads.data || reads.data.some((r) => r.status !== "success")) return undefined;
@@ -117,8 +183,6 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
     }
   }
 
-  const quickAmounts = ["0.01", "0.05", "0.1", "0.5"];
-
   return (
     <div className="card-elevated p-4 space-y-4 sticky top-20">
       {/* Header */}
@@ -137,18 +201,21 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
       </div>
 
       {/* Buy/Sell toggle */}
-      <div className="flex rounded-xl bg-ink-950/60 border border-white/[0.04] p-1">
+      <div className={cn(
+        "flex rounded-xl border p-1",
+        isLight ? "bg-neutral-200/70 border-neutral-300" : "bg-ink-950/60 border-white/[0.04]",
+      )}>
         {(["buy", "sell"] as const).map((s) => (
           <button
             key={s}
             onClick={() => setSide(s)}
             className={cn(
-              "flex-1 rounded-lg py-2.5 text-sm font-semibold capitalize transition-all duration-200",
+              "flex-1 rounded-lg py-2.5 text-sm font-semibold capitalize transition-all duration-200 ease-smooth",
               side === s
                 ? s === "buy"
                   ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-glow-green"
                   : "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-glow-red"
-                : "text-neutral-400 hover:text-neutral-200",
+                : isLight ? "text-neutral-500 hover:text-neutral-900" : "text-neutral-400 hover:text-neutral-200",
             )}
           >
             {s}
@@ -158,7 +225,10 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
 
       {/* Slippage settings */}
       {showSettings && (
-        <div className="rounded-xl border border-white/[0.06] bg-ink-950/40 p-3 space-y-2 animate-fade-in">
+        <div className={cn(
+          "rounded-xl border p-3 space-y-2 animate-fade-in",
+          isLight ? "border-neutral-200 bg-neutral-100" : "border-white/[0.06] bg-ink-950/40",
+        )}>
           <p className="text-xs text-neutral-500">Slippage Tolerance</p>
           <div className="flex gap-1.5">
             {SLIPPAGE_PRESETS.map((s) => (
@@ -169,7 +239,9 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
                   "flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors",
                   slippage === s
                     ? "bg-moon-500/20 text-moon-300 border border-moon-500/30"
-                    : "bg-white/[0.04] text-neutral-400 hover:text-neutral-200 border border-transparent",
+                    : isLight
+                      ? "bg-neutral-200 text-neutral-600 hover:text-neutral-900 border border-transparent"
+                      : "bg-white/[0.04] text-neutral-400 hover:text-neutral-200 border border-transparent",
                 )}
               >
                 {s}%
@@ -183,11 +255,11 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
       <div>
         <label className="mb-1.5 block text-xs text-neutral-500 flex items-center justify-between">
           <span>{side === "buy" ? "You pay" : "You sell"}</span>
-          {address && side === "sell" && tokenBalance !== undefined && tokenBalance !== null && (
+          {address && maxBalance !== undefined && maxBalance > 0n && (
             <button
               type="button"
               className="text-moon-400 hover:text-moon-300 text-[10px] font-medium"
-              onClick={() => setAmount(formatToken(tokenBalance as bigint))}
+              onClick={setMax}
             >
               MAX
             </button>
@@ -198,32 +270,50 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
             type="number"
             inputMode="decimal"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => handleAmountChange(e.target.value)}
             placeholder="0.0"
             className="input pr-24 !text-lg font-semibold tabular"
           />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-neutral-400">
+          <span className={cn(
+            "absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium",
+            isLight ? "text-neutral-500" : "text-neutral-400",
+          )}>
             {side === "buy" ? "ETH" : tokenSymbol}
           </span>
         </div>
-        {side === "buy" && (
-          <div className="mt-2 flex gap-1.5">
-            {quickAmounts.map((a) => (
-              <button
-                key={a}
-                onClick={() => setAmount(a)}
-                className="flex-1 rounded-lg bg-white/[0.04] border border-white/[0.04] py-1.5 text-xs text-neutral-300 hover:bg-white/[0.08] hover:border-white/[0.08] transition-colors tabular"
-              >
-                {a}
-              </button>
-            ))}
+        {address && maxBalance !== undefined && maxBalance > 0n && (
+          <div className="mt-3 space-y-1.5">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={sliderValue}
+              onChange={(e) => handleSliderChange(Number(e.target.value))}
+              className="slider w-full"
+              style={{ ["--slider-progress" as string]: `${sliderValue}%` } as React.CSSProperties}
+              aria-label="Percentage of balance"
+            />
+            <div className={cn(
+              "flex justify-between text-[10px] tabular px-0.5",
+              isLight ? "text-neutral-400" : "text-neutral-600",
+            )}>
+              <span>0%</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
+            </div>
           </div>
         )}
       </div>
 
       {/* Quote */}
       {quote && (
-        <div className="space-y-2 rounded-xl bg-ink-950/40 border border-white/[0.04] p-3 text-xs animate-fade-in">
+        <div className={cn(
+          "space-y-2 rounded-xl border p-3 text-xs animate-fade-in",
+          isLight ? "bg-neutral-100 border-neutral-200" : "bg-ink-950/40 border-white/[0.04]",
+        )}>
           <Row label="You receive" value={quote.outLabel} highlight />
           <Row label="Price" value={formatPrice(currentPrice ? BigInt(Math.floor(currentPrice * 1e18)) : 0n)} />
           <Row
@@ -231,7 +321,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
             value={`${(Number(quote.fee) / 1e18 * 100).toFixed(2)}%`}
             badge={Number(quote.fee) / 1e18 > 0.5 ? "anti-sniper" : undefined}
           />
-          <div className="h-px bg-white/[0.04] my-1" />
+          <div className={cn("h-px my-1", isLight ? "bg-neutral-200" : "bg-white/[0.04]")} />
           <Row label="Min received" value={quote.minOutLabel} muted />
           <Row label="Slippage" value={`${slippage}%`} muted />
         </div>
@@ -286,7 +376,10 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
       </button>
 
       {address && (
-        <p className="text-center text-[10px] text-neutral-600 font-mono">{shortenAddress(address)}</p>
+        <p className={cn(
+          "text-center text-[10px] font-mono",
+          isLight ? "text-neutral-400" : "text-neutral-600",
+        )}>{shortenAddress(address)}</p>
       )}
     </div>
   );

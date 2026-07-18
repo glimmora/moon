@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TxProgress } from "../src/components/tx/TxProgress";
+import { ThemeProvider } from "../src/stores/theme";
 
 const SEPOLIA = 11155111;
 
@@ -11,27 +12,32 @@ const base = {
   confirmationCount: 0,
 };
 
+/** Wrap in ThemeProvider so useTheme() resolves (defaults to dark). */
+function renderWithTheme(ui: React.ReactElement) {
+  return render(<ThemeProvider>{ui}</ThemeProvider>);
+}
+
 describe("TxProgress", () => {
   it("renders nothing when idle", () => {
-    const { container } = render(<TxProgress stage="idle" {...base} />);
+    const { container } = renderWithTheme(<TxProgress stage="idle" {...base} />);
     expect(container.firstChild).toBeNull();
   });
 
   it("renders the stepper with steps while pending and shows confirmation count", () => {
-    render(<TxProgress stage="pending" {...base} confirmationCount={1} />);
+    renderWithTheme(<TxProgress stage="pending" {...base} confirmationCount={1} />);
     expect(screen.getByText("Waiting for wallet signature")).toBeInTheDocument();
     expect(screen.getByText("Confirming on-chain")).toBeInTheDocument();
     expect(screen.getByText("(1/2)")).toBeInTheDocument();
   });
 
   it("renders a success state", () => {
-    render(<TxProgress stage="success" {...base} />);
+    renderWithTheme(<TxProgress stage="success" {...base} />);
     expect(screen.getByText("Confirmed")).toBeInTheDocument();
   });
 
   it("renders an error alert with title, message, recovery and retry", () => {
     const onRetry = vi.fn();
-    render(
+    renderWithTheme(
       <TxProgress
         stage="error"
         {...base}
@@ -53,7 +59,7 @@ describe("TxProgress", () => {
   });
 
   it("shows a gas estimate and an explorer link", () => {
-    render(
+    renderWithTheme(
       <TxProgress
         stage="pending"
         {...base}

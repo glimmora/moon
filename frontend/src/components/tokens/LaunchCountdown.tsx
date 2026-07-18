@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useState } from "react";
 import { Rocket, TrendingUp, Timer } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useTheme } from "@/stores/theme";
 import { GRADUATION_THRESHOLDS } from "@/lib/curve";
 
 interface LaunchCountdownProps {
@@ -31,6 +32,8 @@ export function LaunchCountdown({
   supplyTier,
   compact,
 }: LaunchCountdownProps) {
+  const { theme } = useTheme();
+  const isLight = theme === "light";
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -69,7 +72,7 @@ export function LaunchCountdown({
 
   return (
     <div className={cn(compact ? "space-y-1" : "space-y-2")}>
-      <div className="flex items-center justify-between text-[10px] text-neutral-500">
+      <div className={cn("flex items-center justify-between text-[10px]", isLight ? "text-neutral-500" : "text-neutral-500")}>
         <span className="flex items-center gap-1">
           <TrendingUp className="h-2.5 w-2.5" />
           Graduation
@@ -81,7 +84,7 @@ export function LaunchCountdown({
               {formatEta(eta)}
             </span>
           )}
-          <span className={cn("font-medium", pct >= 80 ? "text-moon-300" : "text-neutral-400")}>
+          <span className={cn("font-medium", pct >= 80 ? (isLight ? "text-moon-600" : "text-moon-300") : (isLight ? "text-neutral-600" : "text-neutral-400"))}>
             {pct.toFixed(0)}%
           </span>
         </div>

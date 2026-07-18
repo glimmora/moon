@@ -1,6 +1,7 @@
 import { Check, Loader2, X, ExternalLink, Fuel, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { explorerName } from "@/lib/explorer";
+import { useTheme } from "@/stores/theme";
 import type { TxStage } from "@/hooks/useTxLifecycle";
 import type { ExplainedError } from "@/lib/txErrors";
 
@@ -48,30 +49,46 @@ export function TxProgress({
   onRetry,
   className,
 }: TxProgressProps) {
+  const { theme } = useTheme();
+  const isLight = theme === "light";
   if (stage === "idle") return null;
 
   if (stage === "error") {
     return (
       <div
         role="alert"
-        className={cn("rounded-xl border border-red-500/30 bg-red-500/10 p-4 space-y-2 animate-fade-in", className)}
+        className={cn(
+          "rounded-xl border p-4 space-y-2 animate-fade-in",
+          isLight ? "border-red-500/30 bg-red-500/10" : "border-red-500/30 bg-red-500/10",
+          className,
+        )}
       >
-        <div className="flex items-center gap-2 text-sm font-semibold text-red-300">
+        <div className={cn(
+          "flex items-center gap-2 text-sm font-semibold",
+          isLight ? "text-red-600" : "text-red-300",
+        )}>
           <X className="h-4 w-4 shrink-0" />
           {error?.title ?? "Transaction failed"}
         </div>
-        {error?.message && <p className="text-xs text-red-300/80 break-words">{error.message}</p>}
+        {error?.message && (
+          <p className={cn("text-xs break-words", isLight ? "text-red-600/80" : "text-red-300/80")}>
+            {error.message}
+          </p>
+        )}
         {error?.recovery && (
-          <p className="text-xs text-neutral-400">
-            <span className="font-medium text-neutral-300">What to do: </span>
+          <p className={cn("text-xs", isLight ? "text-neutral-600" : "text-neutral-400")}>
+            <span className={cn("font-medium", isLight ? "text-neutral-700" : "text-neutral-300")}>What to do: </span>
             {error.recovery}
           </p>
         )}
         <div className="flex items-center gap-2 pt-1">
           {onRetry && (
             <button
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                isLight ? "bg-neutral-200 text-neutral-700 hover:bg-neutral-300" : "bg-white/[0.06] text-neutral-200 hover:bg-white/[0.1]",
+              )}
               onClick={onRetry}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-neutral-200 hover:bg-white/[0.1] transition-colors"
             >
               <RotateCcw className="h-3.5 w-3.5" /> Try again
             </button>
@@ -81,7 +98,10 @@ export function TxProgress({
               href={explorerUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-moon-300 hover:bg-white/[0.1] transition-colors"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                isLight ? "bg-neutral-200 text-moon-700 hover:bg-neutral-300" : "bg-white/[0.06] text-moon-300 hover:bg-white/[0.1]",
+              )}
             >
               <ExternalLink className="h-3.5 w-3.5" /> View on {explorerName(chainId)}
             </a>
@@ -97,7 +117,9 @@ export function TxProgress({
     <div
       className={cn(
         "rounded-xl border p-4 space-y-3 animate-fade-in",
-        isDone ? "border-emerald-500/30 bg-emerald-500/10" : "border-moon-500/20 bg-moon-500/5",
+        isLight
+          ? isDone ? "border-emerald-500/30 bg-emerald-500/10" : "border-moon-500/20 bg-moon-500/5"
+          : isDone ? "border-emerald-500/30 bg-emerald-500/10" : "border-moon-500/20 bg-moon-500/5",
         className,
       )}
       aria-live="polite"
@@ -116,7 +138,7 @@ export function TxProgress({
                     ? "bg-emerald-500 text-white"
                     : status === "active"
                       ? "bg-moon-500 text-white"
-                      : "bg-white/[0.06] text-neutral-600",
+                      : isLight ? "bg-neutral-200 text-neutral-400" : "bg-white/[0.06] text-neutral-600",
                 )}
               >
                 {status === "done" ? (
@@ -133,15 +155,15 @@ export function TxProgress({
                 className={cn(
                   "text-xs transition-colors",
                   status === "done"
-                    ? "text-emerald-400"
+                    ? isLight ? "text-emerald-600" : "text-emerald-400"
                     : status === "active"
-                      ? "text-moon-300 font-medium"
-                      : "text-neutral-600",
+                      ? isLight ? "text-moon-700 font-medium" : "text-moon-300 font-medium"
+                      : isLight ? "text-neutral-400" : "text-neutral-600",
                 )}
               >
                 {step.label}
                 {isConfirmStep && status === "active" && !isDone && (
-                  <span className="ml-1 tabular text-neutral-400">
+                  <span className={cn("ml-1 tabular", isLight ? "text-neutral-500" : "text-neutral-400")}>
                     ({confirmationCount}/{confirmations})
                   </span>
                 )}
@@ -152,9 +174,15 @@ export function TxProgress({
       </div>
 
       {(gasEstimate || explorerUrl) && (
-        <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] pt-2 text-[11px]">
+        <div className={cn(
+          "flex items-center justify-between gap-2 border-t pt-2 text-[11px]",
+          isLight ? "border-neutral-200" : "border-white/[0.06]",
+        )}>
           {gasEstimate ? (
-            <span className="inline-flex items-center gap-1 text-neutral-400" title="Estimated network fee">
+            <span className={cn(
+              "inline-flex items-center gap-1",
+              isLight ? "text-neutral-500" : "text-neutral-400",
+            )} title="Estimated network fee">
               <Fuel className="h-3 w-3" />~{Number(gasEstimate.feeEth).toFixed(6)} {nativeSymbol}
             </span>
           ) : (
@@ -165,7 +193,10 @@ export function TxProgress({
               href={explorerUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-moon-300 hover:text-moon-200 transition-colors"
+              className={cn(
+                "inline-flex items-center gap-1 transition-colors",
+                isLight ? "text-moon-700 hover:text-moon-600" : "text-moon-300 hover:text-moon-200",
+              )}
             >
               <ExternalLink className="h-3 w-3" /> {explorerName(chainId)}
             </a>

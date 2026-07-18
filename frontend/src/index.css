@@ -8,10 +8,16 @@
     --bg-base: #07060d;
     --bg-elev: #0b0a14;
     --bg-card: #100e1c;
+    --bg-hover: rgba(255, 255, 255, 0.04);
+    --bg-active: rgba(255, 255, 255, 0.08);
     --border-subtle: rgba(255, 255, 255, 0.06);
     --border-default: rgba(255, 255, 255, 0.1);
     --text-primary: #f5f5f5;
     --text-secondary: #a3a3a3;
+    --text-muted: #737373;
+    --card-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+    --glass-surface: rgba(255, 255, 255, 0.04);
+    --glass-border: rgba(255, 255, 255, 0.08);
   }
 
   .light {
@@ -19,10 +25,16 @@
     --bg-base: #fafafa;
     --bg-elev: #ffffff;
     --bg-card: #ffffff;
+    --bg-hover: rgba(0, 0, 0, 0.04);
+    --bg-active: rgba(0, 0, 0, 0.08);
     --border-subtle: rgba(0, 0, 0, 0.08);
     --border-default: rgba(0, 0, 0, 0.12);
     --text-primary: #171717;
     --text-secondary: #525252;
+    --text-muted: #a3a3a3;
+    --card-surface: linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.01) 100%);
+    --glass-surface: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(0, 0, 0, 0.08);
   }
 
   html,
@@ -72,22 +84,35 @@
 @layer components {
   /* Glassmorphic card */
   .card {
-    @apply rounded-2xl border border-white/[0.06] bg-white/[0.025] backdrop-blur-xl shadow-inner-glow;
-    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+    @apply rounded-2xl backdrop-blur-xl shadow-inner-glow;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    background-image: var(--card-surface);
   }
 
   .card-hover {
-    @apply card transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.04] hover:shadow-glow;
+    @apply card transition-all duration-300 ease-smooth hover:shadow-glow;
+    transition-property: border-color, background-color, box-shadow, transform;
+  }
+  .card-hover:hover {
+    border-color: var(--border-default);
+    background-color: var(--bg-hover);
   }
 
   /* Elevated card with stronger surface */
   .card-elevated {
-    @apply rounded-2xl border border-white/[0.08] bg-ink-900/80 backdrop-blur-xl shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)];
+    @apply rounded-2xl backdrop-blur-xl shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)];
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-default);
   }
 
   /* Buttons */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none select-none;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200 ease-smooth disabled:opacity-40 disabled:pointer-events-none select-none transform-gpu;
+  }
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+    transition-duration: 75ms;
   }
   .btn-primary {
     @apply btn relative overflow-hidden text-white;
@@ -99,7 +124,7 @@
     transform: translateY(-1px);
   }
   .btn-primary:active {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.97);
   }
 
   .btn-success {
@@ -123,27 +148,84 @@
   }
 
   .btn-ghost {
-    @apply btn bg-white/[0.04] text-neutral-200 border border-white/[0.06] hover:bg-white/[0.08] hover:border-white/[0.1];
+    @apply btn text-neutral-200 border;
+    background-color: var(--bg-hover);
+    border-color: var(--border-subtle);
+  }
+  .light .btn-ghost {
+    @apply text-neutral-700;
   }
   .btn-ghost:hover {
+    background-color: var(--bg-active);
+    border-color: var(--border-default);
     transform: translateY(-1px);
   }
 
+  /* Percentage slider used in the trade panel */
+  .slider {
+    @apply appearance-none h-1.5 rounded-full cursor-pointer;
+    background-color: var(--bg-hover);
+    background-image: linear-gradient(
+      90deg,
+      rgba(168, 85, 247, 0.8) 0%,
+      rgba(168, 85, 247, 0.8) var(--slider-progress, 0%),
+      transparent var(--slider-progress, 0%)
+    );
+  }
+  .slider::-webkit-slider-thumb {
+    @apply appearance-none w-4 h-4 rounded-full cursor-pointer;
+    background: #c084fc;
+    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.2);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .slider::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 6px rgba(168, 85, 247, 0.3);
+    transform: scale(1.1);
+  }
+  .slider::-webkit-slider-thumb:active {
+    box-shadow: 0 0 0 8px rgba(168, 85, 247, 0.4);
+    transform: scale(0.95);
+  }
+  .slider::-moz-range-thumb {
+    @apply w-4 h-4 rounded-full cursor-pointer border-0;
+    background: #c084fc;
+    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.2);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .slider:disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
+
   .btn-outline {
-    @apply btn border border-white/[0.1] text-neutral-200 hover:bg-white/[0.04] hover:border-white/[0.16];
+    @apply btn border text-neutral-200;
+    border-color: var(--border-default);
+  }
+  .light .btn-outline {
+    @apply text-neutral-700;
+  }
+  .btn-outline:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--border-default);
   }
 
   /* Inputs */
   .input {
-    @apply w-full rounded-xl border border-white/[0.08] bg-ink-900/60 px-4 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-600 backdrop-blur-sm transition-all duration-200;
+    @apply w-full rounded-xl px-4 py-2.5 text-sm backdrop-blur-sm transition-all duration-200 ease-smooth;
     /* Prevent iOS zoom: minimum 16px font */
     font-size: 16px;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+  }
+  .input::placeholder {
+    color: var(--text-muted);
   }
   .input:hover {
-    @apply border-white/[0.12];
+    border-color: var(--border-default);
   }
   .input:focus {
-    @apply border-moon-400 bg-ink-900/80;
+    border-color: #a855f7;
+    background-color: var(--bg-card);
     box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
     outline: none;
   }
@@ -153,7 +235,10 @@
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors;
   }
   .chip-neutral {
-    @apply chip bg-white/[0.06] text-neutral-300 border border-white/[0.04];
+    @apply chip border;
+    background-color: var(--bg-hover);
+    border-color: var(--border-subtle);
+    color: var(--text-secondary);
   }
   .chip-moon {
     @apply chip bg-moon-500/15 text-moon-300 border border-moon-500/20;
@@ -186,7 +271,8 @@
 
   /* Progress bar */
   .progress-track {
-    @apply h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06];
+    @apply h-1.5 w-full overflow-hidden rounded-full;
+    background-color: var(--bg-hover);
   }
   .progress-fill {
     @apply h-full rounded-full transition-all duration-500 ease-out;
@@ -197,9 +283,9 @@
   .shimmer {
     background: linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.02) 0%,
-      rgba(255, 255, 255, 0.06) 50%,
-      rgba(255, 255, 255, 0.02) 100%
+      var(--bg-hover) 0%,
+      var(--bg-active) 50%,
+      var(--bg-hover) 100%
     );
     background-size: 200% 100%;
     @apply animate-shimmer rounded-2xl;
@@ -208,7 +294,7 @@
   /* Divider with subtle gradient */
   .divider {
     @apply h-px w-full;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+    background: linear-gradient(90deg, transparent, var(--border-subtle), transparent);
   }
 
   /* Stagger helpers — apply to children for cascading entrance */
@@ -252,10 +338,10 @@
 
   /* Glass overlay */
   .glass {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--glass-surface);
     backdrop-filter: blur(16px) saturate(160%);
     -webkit-backdrop-filter: blur(16px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
   }
 
   /* Subtle grid pattern */
@@ -276,6 +362,14 @@
   .tabular {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
+  }
+
+  /* Exit animations for panels, dropdowns, modals */
+  .animate-fade-out {
+    animation: fadeOut 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .animate-slide-down-out {
+    animation: slideDownOut 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 }
 
@@ -303,6 +397,29 @@ html {
   }
   ::view-transition-new(root) {
     animation-name: fadeInUp;
+  }
+}
+
+/* Exit animation keyframes */
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes slideDownOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
   }
 }
 

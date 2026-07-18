@@ -242,12 +242,18 @@ contract MoonToken is ERC20, AccessControl, ReentrancyGuard, IMoonToken {
         return s_exempt[account];
     }
 
+    // AUDIT/UX-FIX: For minimal-proxy clones, OZ v5's `super.name()` reads the
+    // implementation's *immutable* `_name`, which is empty in every clone (the
+    // constructor never runs on a clone). Always return the per-token storage
+    // values set in initialize() so explorers (Etherscan) read the real name/symbol
+    // from the clone's own storage. Etherscan shows a placeholder ("Token") when
+    // this returns an empty string, so never fall back to the empty immutable.
     function name() public view override returns (string memory) {
-        return bytes(s_name).length > 0 ? s_name : super.name();
+        return s_name;
     }
 
     function symbol() public view override returns (string memory) {
-        return bytes(s_symbol).length > 0 ? s_symbol : super.symbol();
+        return s_symbol;
     }
 
     /* ───────────────────────  Internal helpers  ───────────────── */

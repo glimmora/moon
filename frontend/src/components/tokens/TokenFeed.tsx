@@ -8,12 +8,15 @@ import { cn } from "@/lib/cn";
 import { Link } from "react-router-dom";
 import { formatMarketCap, shortenAddress } from "@/lib/format";
 import { chainMeta } from "@/config/chains";
+import { useTheme } from "@/stores/theme";
 
 type Sort = "trending" | "new" | "graduated";
 
 export function TokenFeed() {
   const { mode } = useNetworkMode();
   const { isOnline } = useBackendHealth();
+  const { theme } = useTheme();
+  const isLight = theme === "light";
   const [sort, setSort] = useState<Sort>("new");
 
   // useTokens now auto-falls back to on-chain reads if backend is offline
@@ -51,8 +54,11 @@ export function TokenFeed() {
           <div className="relative flex items-center gap-4">
             <div className="relative shrink-0">
               <div className="absolute inset-0 rounded-2xl bg-moon-gradient opacity-40 blur-lg group-hover:opacity-60 transition-opacity" />
-              <div className="relative h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-2xl border border-white/[0.1] bg-ink-900">
-                {spotlight.imageUrl ? (
+               <div className={cn(
+                 "relative h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-2xl border bg-ink-900",
+                 isLight ? "border-neutral-200" : "border-white/[0.1]",
+               )}>
+                 {spotlight.imageUrl ? (
                   <img src={spotlight.imageUrl} alt={spotlight.name} className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-xl font-bold text-gradient">
@@ -67,23 +73,23 @@ export function TokenFeed() {
                 <span className="chip-neutral">${spotlight.symbol}</span>
                 <span className="chip-neutral">{chainMeta[spotlight.chainId]?.shortLabel}</span>
               </div>
-              <p className="mt-1 text-sm text-neutral-400">
-                by <span className="font-mono">{shortenAddress(spotlight.creator)}</span> ·{" "}
-                {spotlight.holderCount.toLocaleString()} holders
-              </p>
-              <div className="mt-2 flex items-center gap-4 text-sm">
-                <div>
-                  <span className="text-neutral-500 text-xs">Mkt Cap </span>
-                  <span className="font-semibold tabular">{formatMarketCap(spotlight.marketCapUsd)}</span>
-                </div>
-                <div>
-                  <span className="text-neutral-500 text-xs">Price </span>
-                  <span className="font-semibold tabular">${spotlight.priceUsd.toFixed(6)}</span>
-                </div>
-                <div className="text-neutral-400 font-semibold flex items-center gap-0.5">
-                  <span className="tabular text-xs">Vol ${spotlight.volume24h.toLocaleString()}</span>
-                </div>
-              </div>
+               <p className={cn("mt-1 text-sm", isLight ? "text-neutral-500" : "text-neutral-400")}>
+                 by <span className="font-mono">{shortenAddress(spotlight.creator)}</span> ·{" "}
+                 {spotlight.holderCount.toLocaleString()} holders
+               </p>
+               <div className="mt-2 flex items-center gap-4 text-sm">
+                 <div>
+                   <span className="text-neutral-500 text-xs">Mkt Cap </span>
+                   <span className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>{formatMarketCap(spotlight.marketCapUsd)}</span>
+                 </div>
+                 <div>
+                   <span className="text-neutral-500 text-xs">Price </span>
+                   <span className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>${spotlight.priceUsd.toFixed(6)}</span>
+                 </div>
+                 <div className={cn("font-semibold flex items-center gap-0.5", isLight ? "text-neutral-600" : "text-neutral-400")}>
+                   <span className="tabular text-xs">Vol ${spotlight.volume24h.toLocaleString()}</span>
+                 </div>
+               </div>
             </div>
           </div>
         </Link>
@@ -94,7 +100,10 @@ export function TokenFeed() {
         <h2 className="text-lg font-semibold font-display">
           {mode === "mainnet" ? "Live Tokens" : "Testnet Tokens"}
         </h2>
-        <div className="flex gap-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1">
+        <div className={cn(
+          "flex gap-1 rounded-xl border p-1",
+          isLight ? "bg-neutral-100 border-neutral-200" : "bg-white/[0.04] border-white/[0.06]",
+        )}>
           {(
             [
               { key: "trending" as const, label: "Trending", icon: TrendingUp },
@@ -106,10 +115,14 @@ export function TokenFeed() {
               key={tab.key}
               onClick={() => setSort(tab.key)}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200",
+                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 ease-smooth active:scale-95",
                 sort === tab.key
-                  ? "bg-white/[0.08] text-white shadow-inner-glow"
-                  : "text-neutral-400 hover:text-neutral-200",
+                  ? isLight
+                    ? "bg-white text-neutral-900 shadow-inner-glow"
+                    : "bg-white/[0.08] text-white shadow-inner-glow"
+                  : isLight
+                    ? "text-neutral-500 hover:text-neutral-900"
+                    : "text-neutral-400 hover:text-neutral-200",
               )}
             >
               <tab.icon className="h-3.5 w-3.5" />
