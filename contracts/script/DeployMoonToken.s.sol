@@ -21,7 +21,7 @@ contract SimpleMoonToken is ERC20 {
 /// @notice Deploys the $MOON governance token on a chain.
 contract DeployMoonToken is Script {
     function run() external returns (address moon) {
-        address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
+        address deployer = vm.addr(vm.envUint("WALLET_PRIVATE_KEY"));
         vm.startBroadcast(deployer);
         moon = address(new SimpleMoonToken());
         vm.stopBroadcast();

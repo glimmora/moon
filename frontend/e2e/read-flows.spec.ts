@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { gotoHome } from "./helpers";
 
 /**
- * Read-only navigation flows. These require the backend API (VITE_API_URL) and
+ * Read-only navigation flows. These require the backend API (FRONTEND_API_URL) and
  * a target chain RPC to be reachable, but no wallet writes.
  */
 

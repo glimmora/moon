@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 
-export const E2E_ADDRESS = process.env.VITE_E2E_ADDRESS ?? "";
+export const E2E_ADDRESS = process.env.E2E_ADDRESS ?? "";
 
 /** Wait for the app shell + wagmi to hydrate and the E2E wallet to auto-connect. */
 export async function waitForConnected(page: Page): Promise<void> {

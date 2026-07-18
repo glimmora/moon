@@ -5,7 +5,7 @@ import { env } from "../config/env.js";
 
 // Mirror the Express CORS allowlist (see app.ts) so Socket.io connections from
 // localhost dev ports are accepted in non-production environments.
-const ALLOWED_ORIGINS = new Set(env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean));
+const ALLOWED_ORIGINS = new Set(env.BACKEND_CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean));
 const LOCALHOST = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 export function setupSockets(server: Server) {

@@ -37,13 +37,13 @@ abstract contract DeployScript is Script {
     }
 
     function _deploy() internal returns (Deployed memory d) {
-        address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
-        address treasury = vm.envAddress("TREASURY_ADDRESS");
-        address devWallet = vm.envAddress("DEV_WALLET_ADDRESS");
+        address deployer = vm.addr(vm.envUint("WALLET_PRIVATE_KEY"));
+        address treasury = vm.envAddress("WALLET_TREASURY_ADDRESS");
+        address devWallet = vm.envAddress("WALLET_DEV_ADDRESS");
         // MoonBurner requires a non-zero moonToken address. Use treasury as a
         // placeholder — it can be updated later via MoonBurner.setMoonToken (admin only).
         // In production, deploy the $MOON governance token first and pass its address.
-        address moonTokenGov = vm.envOr("MOON_TOKEN", treasury);
+        address moonTokenGov = vm.envOr("CHAIN_MOON_TOKEN_ETHEREUM_SEPOLIA", treasury);
         // AUDIT-FIX H1: optional Uniswap V2 router for graduation LP seeding (0 = disabled).
         address dexRouter = vm.envOr("DEX_ROUTER", address(0));
 

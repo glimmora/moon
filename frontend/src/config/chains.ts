@@ -35,7 +35,7 @@ const BSC = {
   rpcUrls: {
     default: {
       http: rpcs(
-        import.meta.env.VITE_RPC_BSC,
+        import.meta.env.CHAIN_BSC_RPC_URL,
         "https://bsc-dataseed.binance.org",
         "https://bsc-dataseed1.defibit.io",
         "https://rpc.ankr.com/bsc",
@@ -55,7 +55,7 @@ const BSC_TESTNET = {
   rpcUrls: {
     default: {
       http: rpcs(
-        import.meta.env.VITE_RPC_BSC_TESTNET,
+        import.meta.env.CHAIN_BSC_TESTNET_RPC_URL,
         "https://data-seed-prebsc-1-s1.binance.org:8545",
         "https://data-seed-prebsc-2-s1.binance.org:8545",
         "https://bsc-testnet.public.blastapi.io",
@@ -73,7 +73,7 @@ const BASE = {
   rpcUrls: {
     default: {
       http: rpcs(
-        import.meta.env.VITE_RPC_BASE,
+        import.meta.env.CHAIN_BASE_RPC_URL,
         "https://mainnet.base.org",
         "https://base.llamarpc.com",
         "https://base.publicnode.com",
@@ -91,7 +91,7 @@ const BASE_SEPOLIA = {
   rpcUrls: {
     default: {
       http: rpcs(
-        import.meta.env.VITE_RPC_BASE_SEPOLIA,
+        import.meta.env.CHAIN_BASE_SEPOLIA_RPC_URL,
         "https://sepolia.base.org",
         "https://base-sepolia.publicnode.com",
       ),
@@ -108,7 +108,7 @@ const ARBITRUM = {
   rpcUrls: {
     default: {
       http: rpcs(
-        import.meta.env.VITE_RPC_ARBITRUM,
+        import.meta.env.CHAIN_ARBITRUM_RPC_URL,
         "https://arb1.arbitrum.io/rpc",
         "https://arbitrum.llamarpc.com",
         "https://arbitrum-one.publicnode.com",
@@ -126,7 +126,7 @@ const ARBITRUM_SEPOLIA = {
   rpcUrls: {
     default: {
       http: rpcs(
-        import.meta.env.VITE_RPC_ARBITRUM_SEPOLIA,
+        import.meta.env.CHAIN_ARBITRUM_SEPOLIA_RPC_URL,
         "https://sepolia-rollup.arbitrum.io/rpc",
         "https://arbitrum-sepolia.publicnode.com",
       ),
@@ -143,7 +143,7 @@ const ETHEREUM_SEPOLIA = {
   rpcUrls: {
     default: {
       http: rpcs(
-        import.meta.env.VITE_RPC_ETHEREUM_SEPOLIA,
+        import.meta.env.CHAIN_ETHEREUM_SEPOLIA_RPC_URL,
         "https://ethereum-sepolia-rpc.publicnode.com",
         "https://rpc.sepolia.org",
         "https://sepolia.gateway.tenderly.co",
@@ -161,7 +161,7 @@ export const chainMeta: Record<number, ChainMeta> = {
     explorer: "https://bscscan.com",
     explorerApi: "BscScan",
     nativeSymbol: "BNB",
-    rpcEnv: "VITE_RPC_BSC",
+    rpcEnv: "CHAIN_BSC_RPC_URL",
     isTestnet: false,
   },
   97: {
@@ -169,7 +169,7 @@ export const chainMeta: Record<number, ChainMeta> = {
     shortLabel: "BSC-T",
     explorer: "https://testnet.bscscan.com",
     nativeSymbol: "tBNB",
-    rpcEnv: "VITE_RPC_BSC_TESTNET",
+    rpcEnv: "CHAIN_BSC_TESTNET_RPC_URL",
     isTestnet: true,
   },
   8453: {
@@ -177,7 +177,7 @@ export const chainMeta: Record<number, ChainMeta> = {
     shortLabel: "Base",
     explorer: "https://basescan.org",
     nativeSymbol: "ETH",
-    rpcEnv: "VITE_RPC_BASE",
+    rpcEnv: "CHAIN_BASE_RPC_URL",
     isTestnet: false,
   },
   84532: {
@@ -185,7 +185,7 @@ export const chainMeta: Record<number, ChainMeta> = {
     shortLabel: "Base-S",
     explorer: "https://sepolia.basescan.org",
     nativeSymbol: "ETH",
-    rpcEnv: "VITE_RPC_BASE_SEPOLIA",
+    rpcEnv: "CHAIN_BASE_SEPOLIA_RPC_URL",
     isTestnet: true,
   },
   42161: {
@@ -193,7 +193,7 @@ export const chainMeta: Record<number, ChainMeta> = {
     shortLabel: "Arb",
     explorer: "https://arbiscan.io",
     nativeSymbol: "ETH",
-    rpcEnv: "VITE_RPC_ARBITRUM",
+    rpcEnv: "CHAIN_ARBITRUM_RPC_URL",
     isTestnet: false,
   },
   421614: {
@@ -201,7 +201,7 @@ export const chainMeta: Record<number, ChainMeta> = {
     shortLabel: "Arb-S",
     explorer: "https://sepolia.arbiscan.io",
     nativeSymbol: "ETH",
-    rpcEnv: "VITE_RPC_ARBITRUM_SEPOLIA",
+    rpcEnv: "CHAIN_ARBITRUM_SEPOLIA_RPC_URL",
     isTestnet: true,
   },
   11155111: {
@@ -209,7 +209,7 @@ export const chainMeta: Record<number, ChainMeta> = {
     shortLabel: "Eth-S",
     explorer: "https://sepolia.etherscan.io",
     nativeSymbol: "ETH",
-    rpcEnv: "VITE_RPC_ETHEREUM_SEPOLIA",
+    rpcEnv: "CHAIN_ETHEREUM_SEPOLIA_RPC_URL",
     isTestnet: true,
   },
 };

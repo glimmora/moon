@@ -102,34 +102,34 @@ start_backend() {
     cat > .env <<'EOF'
 BACKEND_PORT=4000
 NODE_ENV=development
-CORS_ORIGIN=http://localhost:5173
-DATABASE_URL=postgresql://moon:moon@localhost:5432/moonfun
-JWT_SECRET=dev-secret-change-me-to-a-32-char-minimum-value
-BSC_RPC_URL=https://bsc-dataseed.binance.org
-BASE_RPC_URL=https://mainnet.base.org
-ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
-BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
-BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
-ARBITRUM_SEPOLIA_RPC_URL=https://arbitrum-sepolia-rpc.publicnode.com
-ETHEREUM_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
-POLL_INTERVAL_MS=4000
-START_BLOCK_OFFSET=10000
-MAX_BLOCK_BATCH=500
-FACTORY_ETHEREUM_SEPOLIA=0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3
-TREASURY_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
-DEV_WALLET_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
+BACKEND_CORS_ORIGIN=http://localhost:5173
+DB_URL=postgresql://moon:moon@localhost:5432/moonfun
+AUTH_JWT_SECRET=dev-secret-change-me-to-a-32-char-minimum-value
+CHAIN_BSC_RPC_URL=https://bsc-dataseed.binance.org
+CHAIN_BASE_RPC_URL=https://mainnet.base.org
+CHAIN_ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
+CHAIN_BSC_TESTNET_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
+CHAIN_BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
+CHAIN_ARBITRUM_SEPOLIA_RPC_URL=https://arbitrum-sepolia-rpc.publicnode.com
+CHAIN_ETHEREUM_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+BACKEND_POLL_INTERVAL_MS=4000
+BACKEND_START_BLOCK_OFFSET=10000
+BACKEND_MAX_BLOCK_BATCH=500
+CHAIN_FACTORY_ETHEREUM_SEPOLIA=0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3
+WALLET_TREASURY_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
+WALLET_DEV_ADDRESS=0xbBfD7255a1817b7d02a5cc9A0669a9C80599ef24
 EOF
   fi
 
   # Show DB URL
   if [ -f ".env" ]; then
-    local dburl=$(grep -E "^DATABASE_URL=" .env | cut -d= -f2- || echo "?")
+    local dburl=$(grep -E "^DB_URL=" .env | cut -d= -f2- || echo "?")
     info "Database URL: $dburl"
   fi
 
   # Generate Prisma client + push schema (Postgres only).
   if [ -f "prisma/schema.prisma" ]; then
-    local db_url=$(grep -E "^DATABASE_URL=" .env 2>/dev/null | cut -d= -f2- | tr -d '[:space:]')
+    local db_url=$(grep -E "^DB_URL=" .env 2>/dev/null | cut -d= -f2- | tr -d '[:space:]')
 
     info "Testing Postgres connection…"
     local pg_user=$(echo "$db_url" | sed -n 's|postgresql://\([^:]*\):.*|\1|p')

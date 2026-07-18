@@ -16,7 +16,7 @@ import { prisma } from "./utils/db.js";
  * HTTP server in index.ts.
  */
 /** Explicit allowlist from CORS_ORIGIN (comma-separated). */
-const allowlist = new Set(env.CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean));
+const allowlist = new Set(env.BACKEND_CORS_ORIGIN.split(",").map((s) => s.trim()).filter(Boolean));
 
 // Outside production, also permit any localhost/127.0.0.1 origin (any port) so
 // the Vite dev server, the preview server, and Playwright E2E can all reach the

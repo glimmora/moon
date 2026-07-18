@@ -4,11 +4,11 @@ import { defineConfig, devices } from "@playwright/test";
  * Playwright E2E config for moon.fun.
  *
  * The dev server is started with the test-only wallet gate enabled:
- *   VITE_E2E=true                → activates the local PK connector + auto-connect
- *   VITE_E2E_PRIVATE_KEY=0x…     → throwaway/testnet key (never a prod secret)
- *   VITE_E2E_CHAIN_ID=11155111   → default connected chain
- *   VITE_RPC_ETHEREUM_SEPOLIA    → target RPC (anvil fork for `e2e`, live for `live`)
- *   VITE_API_URL                 → running backend
+ *   E2E_ENABLED=true                 → activates the local PK connector + auto-connect
+ *   E2E_PRIVATE_KEY=0x…             → throwaway/testnet key (never a prod secret)
+ *   E2E_CHAIN_ID=11155111           → default connected chain
+ *   CHAIN_ETHEREUM_SEPOLIA_RPC_URL  → target RPC (anvil fork for `e2e`, live for `live`)
+ *   FRONTEND_API_URL                → running backend
  *
  * These are injected by the runner scripts (see package.json), not hardcoded, so
  * the same specs run against both the anvil fork and live Sepolia.

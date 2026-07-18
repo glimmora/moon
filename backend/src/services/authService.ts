@@ -77,14 +77,14 @@ export const authService = {
 
     const address = getAddress(siwe.address);
     const payload: AuthTokenPayload = { sub: address, chainId: siwe.chainId };
-    const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: JWT_TTL });
+    const token = jwt.sign(payload, env.AUTH_JWT_SECRET, { expiresIn: JWT_TTL });
     return { token, address, chainId: siwe.chainId };
   },
 
   /** Verify a JWT and return its payload, or throw AuthError. */
   verifyToken(token: string): AuthTokenPayload {
     try {
-      const decoded = jwt.verify(token, env.JWT_SECRET) as AuthTokenPayload;
+      const decoded = jwt.verify(token, env.AUTH_JWT_SECRET) as AuthTokenPayload;
       return decoded;
     } catch {
       throw new AuthError("Invalid or expired token");

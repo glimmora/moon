@@ -23,8 +23,8 @@ function resolveTestDbUrl(): string {
 }
 
 process.env.NODE_ENV = "test";
-process.env.JWT_SECRET =
-  process.env.JWT_SECRET ?? "test-secret-test-secret-test-secret-123456";
-process.env.DATABASE_PROVIDER = "postgresql";
-process.env.DATABASE_URL = resolveTestDbUrl();
-process.env.CORS_ORIGIN = process.env.CORS_ORIGIN ?? "http://localhost:5173";
+process.env.AUTH_JWT_SECRET =
+  process.env.AUTH_JWT_SECRET ?? "test-secret-test-secret-test-secret-123456";
+process.env.DB_PROVIDER = "postgresql";
+process.env.DB_URL = resolveTestDbUrl();
+process.env.BACKEND_CORS_ORIGIN = process.env.BACKEND_CORS_ORIGIN ?? "http://localhost:5173";

@@ -4,7 +4,7 @@ import { env } from "../config/env.js";
 // Many concurrent consumers share this single client (Express API + websocket
 // server + one chain poller and one holder poller per configured chain). Ensure
 // the connection pool is large enough to avoid pool-timeout errors under load,
-// unless the operator has already pinned connection_limit in DATABASE_URL.
+// unless the operator has already pinned connection_limit in DB_URL.
 function withPoolDefaults(url: string): string {
   try {
     const u = new URL(url);
@@ -22,5 +22,5 @@ function withPoolDefaults(url: string): string {
 
 export const prisma = new PrismaClient({
   log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
-  datasourceUrl: withPoolDefaults(env.DATABASE_URL),
+  datasourceUrl: withPoolDefaults(env.DB_URL),
 });

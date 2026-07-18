@@ -12,10 +12,10 @@ import { moonChains } from "./chains";
 /**
  * TEST-ONLY wallet connector.
  *
- * Activated exclusively when `VITE_E2E === "true"`. It backs a wagmi connector
+ * Activated exclusively when `E2E_ENABLED === "true"`. It backs a wagmi connector
  * with a local viem private-key account so Playwright can drive the full
  * signing/broadcast path with no browser wallet extension. The private key is
- * supplied at build/serve time via `VITE_E2E_PRIVATE_KEY` and MUST only ever be
+ * supplied at build/serve time via `E2E_PRIVATE_KEY` and MUST only ever be
  * a throwaway/testnet key — never a production secret.
  *
  * This module is a no-op in normal builds: `e2eConnectors()` returns `[]` unless
@@ -23,7 +23,7 @@ import { moonChains } from "./chains";
  * real users.
  */
 
-const E2E_ENABLED = import.meta.env.VITE_E2E === "true";
+const E2E_ENABLED = import.meta.env.E2E_ENABLED === "true";
 
 function normalizePk(raw: string): Hex {
   const v = raw.trim();
@@ -32,13 +32,13 @@ function normalizePk(raw: string): Hex {
 
 /** Build an EIP-1193 provider backed by a local viem PK account. */
 function buildProvider() {
-  const pk = import.meta.env.VITE_E2E_PRIVATE_KEY as string | undefined;
-  if (!pk) throw new Error("[e2e] VITE_E2E_PRIVATE_KEY is required when VITE_E2E=true");
+  const pk = import.meta.env.E2E_PRIVATE_KEY as string | undefined;
+  if (!pk) throw new Error("[e2e] E2E_PRIVATE_KEY is required when E2E_ENABLED=true");
   const account = privateKeyToAccount(normalizePk(pk));
 
   // Per-chain read/write clients so we can serve eth_* RPC and locally sign.
   const chainsById = new Map(moonChains.map((c) => [c.id, c]));
-  let currentChainId = Number(import.meta.env.VITE_E2E_CHAIN_ID ?? moonChains[0]?.id ?? 11155111);
+  let currentChainId = Number(import.meta.env.E2E_CHAIN_ID ?? moonChains[0]?.id ?? 11155111);
 
   function clientsFor(chainId: number) {
     const chain = chainsById.get(chainId) ?? moonChains[0];

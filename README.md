@@ -110,7 +110,7 @@ forge test -vvv
 # 2. Backend
 cd backend
 cp .env.example .env
-# Edit .env — set DATABASE_URL to your Postgres connection
+# Edit .env — set DB_URL to your Postgres connection
 npm install
 npx prisma generate
 npx prisma db push

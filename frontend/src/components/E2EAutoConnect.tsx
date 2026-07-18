@@ -5,7 +5,7 @@ import { isE2E } from "@/config/e2eConnector";
 /**
  * TEST-ONLY: auto-connects the local E2E private-key connector on mount so
  * Playwright specs start in a connected state without driving the RainbowKit
- * modal. Renders (and does anything) only when `VITE_E2E === "true"`.
+ * modal. Renders (and does anything) only when `E2E_ENABLED === "true"`.
  */
 export function E2EAutoConnect() {
   const { connect, connectors } = useConnect();

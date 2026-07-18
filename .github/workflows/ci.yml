@@ -14,8 +14,8 @@ jobs:
     name: Backend + Frontend
     runs-on: ubuntu-latest
     env:
-      JWT_SECRET: test-secret-test-secret-test-secret-123456
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/moonfun_test
+      AUTH_JWT_SECRET: test-secret-test-secret-test-secret-123456
+      DB_URL: postgresql://postgres:postgres@localhost:5432/moonfun_test
       NODE_ENV: test
     services:
       postgres:
@@ -126,23 +126,23 @@ jobs:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
     env:
-      JWT_SECRET: e2e-test-secret-e2e-test-secret-1234567890
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/moonfun_test
+      AUTH_JWT_SECRET: e2e-test-secret-e2e-test-secret-1234567890
+      DB_URL: postgresql://postgres:postgres@localhost:5432/moonfun_test
       NODE_ENV: test
-      ETHEREUM_SEPOLIA_RPC_URL: https://sepolia.drpc.org
-      FACTORY_ETHEREUM_SEPOLIA: "0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3"
-      VITE_E2E: "true"
-      VITE_E2E_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-      VITE_E2E_CHAIN_ID: "11155111"
-      VITE_API_URL: "http://localhost:4000"
-      VITE_RPC_ETHEREUM_SEPOLIA: "https://sepolia.drpc.org"
-      VITE_FACTORY_ETHEREUM_SEPOLIA: "0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3"
-      VITE_FEE_ROUTER_ETHEREUM_SEPOLIA: "0x95032e828144707e9754993e421c31dE986A3bb1"
-      VITE_CREATOR_FEE_VAULT_ETHEREUM_SEPOLIA: "0x3c67d2f9f3aA5B909332f2eF7a3862b58015345B"
-      VITE_REFERRAL_REGISTRY_ETHEREUM_SEPOLIA: "0xADB082E1AA4696bffDAD8aB754874d31E37e9Fe0"
-      VITE_MOON_BURNER_ETHEREUM_SEPOLIA: "0x47240bE29d50Eeb46bCCE0c227D67A34CE18682c"
-      VITE_MOON_TOKEN_ETHEREUM_SEPOLIA: "0x4E0994001515F4fe9335bbE73691750859a82835"
-      VITE_WALLETCONNECT_PROJECT_ID: "moon-fun-demo"
+      CHAIN_ETHEREUM_SEPOLIA_RPC_URL: https://sepolia.drpc.org
+      CHAIN_FACTORY_ETHEREUM_SEPOLIA: "0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3"
+      E2E_ENABLED: "true"
+      E2E_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+      E2E_CHAIN_ID: "11155111"
+      FRONTEND_API_URL: "http://localhost:4000"
+      CHAIN_RPC_ETHEREUM_SEPOLIA: "https://sepolia.drpc.org"
+      CHAIN_FACTORY_ETHEREUM_SEPOLIA: "0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3"
+      CHAIN_FEE_ROUTER_ETHEREUM_SEPOLIA: "0x95032e828144707e9754993e421c31dE986A3bb1"
+      CHAIN_CREATOR_FEE_VAULT_ETHEREUM_SEPOLIA: "0x3c67d2f9f3aA5B909332f2eF7a3862b58015345B"
+      CHAIN_REFERRAL_REGISTRY_ETHEREUM_SEPOLIA: "0xADB082E1AA4696bffDAD8aB754874d31E37e9Fe0"
+      CHAIN_MOON_BURNER_ETHEREUM_SEPOLIA: "0x47240bE29d50Eeb46bCCE0c227D67A34CE18682c"
+      CHAIN_MOON_TOKEN_ETHEREUM_SEPOLIA: "0x4E0994001515F4fe9335bbE73691750859a82835"
+      FRONTEND_WALLETCONNECT_PROJECT_ID: "moon-fun-demo"
     services:
       postgres:
         image: postgres:16-alpine
@@ -184,9 +184,9 @@ jobs:
           node --import tsx src/index.ts &
           echo $! > /tmp/backend.pid
         env:
-          POLL_INTERVAL_MS: "2000"
-          CONFIRMATIONS: "1"
-          REORG_REWIND_BLOCKS: "1"
+          BACKEND_POLL_INTERVAL_MS: "2000"
+          BACKEND_CONFIRMATIONS: "1"
+          BACKEND_REORG_REWIND_BLOCKS: "1"
 
       - name: Wait for backend health
         run: |

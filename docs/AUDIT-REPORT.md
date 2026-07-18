@@ -515,13 +515,13 @@ This fetches every Transfer log since contract deployment. On a popular token wi
 
 **Fix:**
 
-Per-token checkpoint + bounded block range (`MAX_BLOCK_BATCH` from env, default 500):
+Per-token checkpoint + bounded block range (`BACKEND_MAX_BLOCK_BATCH` from env, default 500):
 
 ```ts
 const checkpointId = `holders-${chain.chainId}-${tokenAddress.toLowerCase()}`;
 const checkpoint = await prisma.indexerCheckpoint.findUnique({ where: { id: checkpointId } });
 const current = await client.getBlockNumber();
-const MAX_RANGE = BigInt(env.MAX_BLOCK_BATCH);
+const MAX_RANGE = BigInt(env.BACKEND_MAX_BLOCK_BATCH);
 let fromBlock = checkpoint?.lastBlock ? BigInt(checkpoint.lastBlock) + 1n
   : (current > MAX_RANGE ? current - MAX_RANGE : 0n);
 const toBlock = current - fromBlock > MAX_RANGE ? fromBlock + MAX_RANGE : current;
@@ -686,14 +686,14 @@ No proxies in use. The factory uses EIP-1167 minimal proxies (Clones) for MoonTo
 |---|---|---|
 | Input validation on API routes | ✅ | `chainId`/`address` parsed + bounded. `limit` capped at 200. |
 | Rate limiting | ✅ | 120 req/min per IP via `express-rate-limit`. |
-| CORS | ✅ | Restricted to `CORS_ORIGIN` env var. |
+| CORS | ✅ | Restricted to `BACKEND_CORS_ORIGIN` env var. |
 | SQL injection | ✅ | Prisma parameterized queries. |
 | NoSQL injection | ✅ | N/A (Postgres only). |
 | Socket.io authentication | ⚠️ | No auth — anyone can subscribe to any token room. Low risk (public data only). |
 | Indexer checkpoint integrity | ✅ | Per-chain + per-token checkpoints. Resumes on restart. |
 | Holder listener | ✅ Fixed (I-4) | Bounded block range + per-token checkpoint. |
 | Error handling | ✅ | All routes use try/catch + `next(e)`. Global error handler returns 500. |
-| Secrets management | ⚠️ | `JWT_SECRET` defaults to `"dev-secret"` — must be overridden in production. RPC URLs are not validated as private. |
+| Secrets management | ⚠️ | `AUTH_JWT_SECRET` defaults to `"dev-secret"` — must be overridden in production. RPC URLs are not validated as private. |
 | Graceful shutdown | ✅ | SIGTERM handler closes IO + DB. |
 
 ---
@@ -726,7 +726,7 @@ No proxies in use. The factory uses EIP-1167 minimal proxies (Clones) for MoonTo
 - No fuzz / invariant tests (I-10) — schedule 50k+ runs per curve shape.
 - No bug bounty (I-11) — launch Immunefi before mainnet.
 - `MoonV3Concentrator` is a stub (I-5) — replace before mainnet.
-- Backend `JWT_SECRET` default is weak (must override in prod).
+- Backend `AUTH_JWT_SECRET` default is weak (must override in prod).
 - Socket.io has no auth (low risk — public data).
 
 **Score breakdown:**
@@ -748,7 +748,7 @@ No proxies in use. The factory uses EIP-1167 minimal proxies (Clones) for MoonTo
 3. **Fuzz testing** — 50,000+ runs per curve shape via `forge test --fuzz-runs 50000`. Invariant tests for `s_realTokenReserves ≤ s_totalSupplyInit`, `totalSupply == s_realTokenReserves` (pre-graduation), and `creatorOf(token)` immutability.
 4. **Immunefi bug bounty** — $50k–$500k range depending on TVL.
 5. **Replace `MoonV3Concentrator` stub** with a full V3 migrator (or remove it from deployment).
-6. **Override `JWT_SECRET`** with a 32+ char random string in production.
+6. **Override `AUTH_JWT_SECRET`** with a 32+ char random string in production.
 7. **Add Socket.io auth** (JWT or signed ticket) if backend is exposed publicly.
 
 ### Should-do (hardening)

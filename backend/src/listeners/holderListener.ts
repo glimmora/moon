@@ -91,11 +91,11 @@ async function refreshHolders(
   if (head === 0n) return;
 
   // Confirmation lag so holder balances don't reflect reorg-able blocks.
-  const confirmations = BigInt(env.CONFIRMATIONS);
+  const confirmations = BigInt(env.BACKEND_CONFIRMATIONS);
   const safeHead = head > confirmations ? head - confirmations : 0n;
   if (safeHead === 0n) return;
 
-  const MAX_RANGE = BigInt(env.MAX_BLOCK_BATCH);
+  const MAX_RANGE = BigInt(env.BACKEND_MAX_BLOCK_BATCH);
   let fromBlock: bigint;
   if (checkpoint?.lastBlock) {
     fromBlock = BigInt(checkpoint.lastBlock) + 1n;

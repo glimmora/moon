@@ -1,7 +1,7 @@
 import { type TokenListItem } from "@/hooks/useTokens";
 
 /** Single source of truth for the backend base URL (trailing slash stripped). */
-export const API_BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+export const API_BASE = (import.meta.env.FRONTEND_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
 const BASE = API_BASE;
 
 export interface Holder {

@@ -11,7 +11,7 @@ set -a
 [ -f .env ] && source .env
 set +a
 
-CHAINS="${MOON_DEPLOY_CHAINS:-bsc-testnet base-sepolia arbitrum-sepolia ethereum-sepolia}"
+CHAINS="${DEPLOY_CHAINS:-bsc-testnet base-sepolia arbitrum-sepolia ethereum-sepolia}"
 
 # Map chain key → script contract + RPC env var.
 declare -A SCRIPT=(
@@ -24,13 +24,13 @@ declare -A SCRIPT=(
   ["ethereum-sepolia"]="DeployEthereumSepolia"
 )
 declare -A RPC=(
-  ["bsc"]="BSC_RPC_URL"
-  ["base"]="BASE_RPC_URL"
-  ["arbitrum"]="ARBITRUM_RPC_URL"
-  ["bsc-testnet"]="BSC_TESTNET_RPC_URL"
-  ["base-sepolia"]="BASE_SEPOLIA_RPC_URL"
-  ["arbitrum-sepolia"]="ARBITRUM_SEPOLIA_RPC_URL"
-  ["ethereum-sepolia"]="ETHEREUM_SEPOLIA_RPC_URL"
+  ["bsc"]="CHAIN_BSC_RPC_URL"
+  ["base"]="CHAIN_BASE_RPC_URL"
+  ["arbitrum"]="CHAIN_ARBITRUM_RPC_URL"
+  ["bsc-testnet"]="CHAIN_BSC_TESTNET_RPC_URL"
+  ["base-sepolia"]="CHAIN_BASE_SEPOLIA_RPC_URL"
+  ["arbitrum-sepolia"]="CHAIN_ARBITRUM_SEPOLIA_RPC_URL"
+  ["ethereum-sepolia"]="CHAIN_ETHEREUM_SEPOLIA_RPC_URL"
 )
 
 echo "🚀 moon.fun multi-chain deploy"

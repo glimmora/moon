@@ -78,9 +78,9 @@ export async function startChainListener(chain: ChainConfig, io?: MoonIO): Promi
       const head = await client.getBlockNumber();
       // Confirmation lag: never index newer than (head - CONFIRMATIONS) so that
       // shallow reorgs never surface indexed data we'd have to undo.
-      const confirmations = BigInt(env.CONFIRMATIONS);
+      const confirmations = BigInt(env.BACKEND_CONFIRMATIONS);
       const safeHead = head > confirmations ? head - confirmations : 0n;
-      if (safeHead === 0n || safeHead <= state.lastBlock - BigInt(env.REORG_REWIND_BLOCKS)) {
+      if (safeHead === 0n || safeHead <= state.lastBlock - BigInt(env.BACKEND_REORG_REWIND_BLOCKS)) {
         // Nothing new past the safe head — but still allow rewind scan below only
         // if we have new safe blocks. If not, bail early.
         if (safeHead <= state.lastBlock) return;
@@ -89,10 +89,10 @@ export async function startChainListener(chain: ChainConfig, io?: MoonIO): Promi
       // Reorg heal: re-scan the last REORG_REWIND_BLOCKS confirmed blocks. Upserts
       // are keyed by (chainId, txHash, tokenAddress) so re-processing is idempotent,
       // and a canonical reorg replacement will overwrite stale rows.
-      const rewind = BigInt(env.REORG_REWIND_BLOCKS);
+      const rewind = BigInt(env.BACKEND_REORG_REWIND_BLOCKS);
       const fromBlock = state.lastBlock + 1n > rewind ? state.lastBlock + 1n - rewind : 1n;
-      const toBlock = safeHead > fromBlock + BigInt(env.MAX_BLOCK_BATCH)
-        ? fromBlock + BigInt(env.MAX_BLOCK_BATCH)
+      const toBlock = safeHead > fromBlock + BigInt(env.BACKEND_MAX_BLOCK_BATCH)
+        ? fromBlock + BigInt(env.BACKEND_MAX_BLOCK_BATCH)
         : safeHead;
 
       if (toBlock < fromBlock) return;
@@ -103,7 +103,7 @@ export async function startChainListener(chain: ChainConfig, io?: MoonIO): Promi
       // double-counting within a small safety overlap (CONFIRMATIONS blocks),
       // so they can also scan the reorg-rewind window like factory/curve events.
       // This catches crash-gap events that would otherwise be permanently lost.
-      const feeRewind = BigInt(env.CONFIRMATIONS);
+      const feeRewind = BigInt(env.BACKEND_CONFIRMATIONS);
       const feeFrom = state.lastBlock + 1n > feeRewind ? state.lastBlock + 1n - feeRewind : 1n;
       if (toBlock >= feeFrom) {
         await pollReferralAndFeeEvents(client, chain, feeFrom, toBlock, state);
@@ -122,13 +122,13 @@ export async function startChainListener(chain: ChainConfig, io?: MoonIO): Promi
     } catch (err) {
       // Exponential backoff (capped at 60s) to avoid hammering a failing RPC.
       state.consecutiveErrors += 1;
-      const delay = Math.min(60_000, env.POLL_INTERVAL_MS * 2 ** Math.min(state.consecutiveErrors, 5));
+      const delay = Math.min(60_000, env.BACKEND_POLL_INTERVAL_MS * 2 ** Math.min(state.consecutiveErrors, 5));
       state.backoffUntil = Date.now() + delay;
       logger.error({ chainId: chain.chainId, err, backoffMs: delay }, "Chain listener poll error — backing off");
     } finally {
       state.polling = false;
     }
-  }, env.POLL_INTERVAL_MS);
+  }, env.BACKEND_POLL_INTERVAL_MS);
 
   // Store ref for cleanup on shutdown.
   const s = states.get(chain.chainId);
@@ -137,7 +137,7 @@ export async function startChainListener(chain: ChainConfig, io?: MoonIO): Promi
 
 async function getRecentBlock(client: ReturnType<typeof createPublicClient>): Promise<bigint> {
   const current = await client.getBlockNumber();
-  return current > BigInt(env.START_BLOCK_OFFSET) ? current - BigInt(env.START_BLOCK_OFFSET) : 0n;
+  return current > BigInt(env.BACKEND_START_BLOCK_OFFSET) ? current - BigInt(env.BACKEND_START_BLOCK_OFFSET) : 0n;
 }
 
 async function pollFactoryEvents(

@@ -4,14 +4,14 @@ import type { Chain } from "wagmi/chains";
 import { moonChains } from "./chains";
 import { e2eConnectors } from "./e2eConnector";
 
-const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID ?? "moon-fun-demo";
+const projectId = import.meta.env.FRONTEND_WALLETCONNECT_PROJECT_ID ?? "moon-fun-demo";
 
 // WalletConnect (and RainbowKit's WC-based connectors) need a real projectId from
 // https://cloud.walletconnect.com. Without it, mobile/QR wallet connections fail.
 if (projectId === "moon-fun-demo") {
   console.warn(
     "[moon.fun] Using a placeholder WalletConnect projectId. " +
-      "Set VITE_WALLETCONNECT_PROJECT_ID for reliable wallet connections.",
+      "Set FRONTEND_WALLETCONNECT_PROJECT_ID for reliable wallet connections.",
   );
 }
 

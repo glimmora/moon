@@ -68,15 +68,15 @@ npm run dev        # http://localhost:4000
 
 Database setup:
 - The dev.sh script auto-configures the database (Postgres or SQLite)
-- For manual setup, set `DATABASE_PROVIDER` + `DATABASE_URL` in `backend/.env`
+- For manual setup, set `DB_PROVIDER` + `DB_URL` in `backend/.env`
 - Run `npx prisma generate` + `npx prisma db push` after schema changes
 
 ### On-chain tests (Ethereum Sepolia)
 
 ```bash
 # Set env vars
-export PRIVATE_KEY=0x...  # testnet wallet
-export RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
+export WALLET_PRIVATE_KEY=0x...  # testnet wallet
+export CHAIN_ETHEREUM_SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 
 # Run the security test suite
 ./scripts/security-test-sepolia.sh
@@ -100,7 +100,7 @@ export RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
   Use `provider = "postgresql"` and sed-swap to `sqlite` in dev.sh if needed.
 - Don't name a scalar field the same as a relation (e.g. `holders Int` + `holders Holder[]`
   conflicts — use `holderCount` for the scalar).
-- `DATABASE_URL` validation must use `z.string().min(1)`, not `z.string().url()` (SQLite
+- `DB_URL` validation must use `z.string().min(1)`, not `z.string().url()` (SQLite
   paths like `file:./dev.db` are not valid URLs).
 
 ## Commit conventions
