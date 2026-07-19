@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# moon.fun — Comprehensive On-Chain Security & Feature Test Suite v2
+# Moon — Comprehensive On-Chain Security & Feature Test Suite v2
 # Fixed argument passing.
 
 set -uo pipefail
@@ -51,7 +51,7 @@ er() {
 }
 
 echo "═══════════════════════════════════════════════════════════════"
-echo "  moon.fun — On-Chain Security & Feature Tests v2"
+echo "  Moon — On-Chain Security & Feature Tests v2"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
 
@@ -60,19 +60,19 @@ echo "── SECTION 1: FEATURE TESTS ──"
 
 echo "1.1: Create token (1B, LINEAR)"
 R=$(cast send "$FACTORY" 'createToken((string,string,string,string,uint256,uint256,uint256,uint8,uint8))' \
-  '("SecTest1B","ST1","https://moon.fun/t.png","1B Linear",100,500,60,0,0)' \
+  '("SecTest1B","ST1","https://Moon/t.png","1B Linear",100,500,60,0,0)' \
   --rpc-url "$RPC" --private-key "$PK" --gas-price "$GAS" --gas-limit 3000000 2>&1)
 es "createToken 1B LINEAR" "$R"
 
 echo "1.2: Create token (10B, LOGARITHMIC)"
 R=$(cast send "$FACTORY" 'createToken((string,string,string,string,uint256,uint256,uint256,uint8,uint8))' \
-  '("SecTest10B","ST2","https://moon.fun/t.png","10B Log",100,500,60,1,2)' \
+  '("SecTest10B","ST2","https://Moon/t.png","10B Log",100,500,60,1,2)' \
   --rpc-url "$RPC" --private-key "$PK" --gas-price "$GAS" --gas-limit 3000000 2>&1)
 es "createToken 10B LOGARITHMIC" "$R"
 
 echo "1.3: Create token (100B, EXPONENTIAL)"
 R=$(cast send "$FACTORY" 'createToken((string,string,string,string,uint256,uint256,uint256,uint8,uint8))' \
-  '("SecTest100B","ST3","https://moon.fun/t.png","100B Exp",100,500,60,2,1)' \
+  '("SecTest100B","ST3","https://Moon/t.png","100B Exp",100,500,60,2,1)' \
   --rpc-url "$RPC" --private-key "$PK" --gas-price "$GAS" --gas-limit 3000000 2>&1)
 es "createToken 100B EXPONENTIAL" "$R"
 

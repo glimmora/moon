@@ -5,13 +5,13 @@ services:
     environment:
       POSTGRES_USER: moon
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-moon}
-      POSTGRES_DB: moonfun
+      POSTGRES_DB: moon
     volumes:
       - db-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U moon -d moonfun"]
+      test: ["CMD-SHELL", "pg_isready -U moon -d moon"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -33,7 +33,7 @@ services:
     environment:
       NODE_ENV: production
       BACKEND_PORT: 4000
-      DB_URL: postgresql://moon:${POSTGRES_PASSWORD:-moon}@db:5432/moonfun
+      DB_URL: postgresql://moon:${POSTGRES_PASSWORD:-moon}@db:5432/moon
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET is required}
       BACKEND_CORS_ORIGIN: ${BACKEND_CORS_ORIGIN:-http://localhost:8080}
     ports:

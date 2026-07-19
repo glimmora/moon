@@ -1,12 +1,12 @@
-# Contributing to moon.fun
+# Contributing to Moon
 
 Thanks for your interest in contributing! This guide covers the basics.
 
 ## Repository setup
 
 ```bash
-git clone https://github.com/glimmora/moon.git moon.fun
-cd moon.fun
+git clone https://github.com/glimmora/moon.git Moon
+cd Moon
 ```
 
 Install Foundry and contract dependencies:
@@ -140,7 +140,7 @@ reviewed by at least one core maintainer.
 ## Reporting issues
 
 - Bugs: open a GitHub issue with reproduction steps.
-- Security: email security@moon.fun (see [`SECURITY.md`](./SECURITY.md)).
+- Security: email security@Moon (see [`SECURITY.md`](./SECURITY.md)).
 
 ## License
 

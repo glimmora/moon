@@ -12,7 +12,7 @@ interface NetworkModeContextValue {
 
 const NetworkModeContext = createContext<NetworkModeContextValue | undefined>(undefined);
 
-const STORAGE_KEY = "moon.fun.networkMode";
+const STORAGE_KEY = "Moon.networkMode";
 
 function safeRead<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;

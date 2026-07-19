@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# moon.fun — run all static analysis + tests for a pre-audit pass.
+# Moon — run all static analysis + tests for a pre-audit pass.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT/contracts"
 
-echo "🔍 moon.fun audit pipeline"
+echo "🔍 Moon audit pipeline"
 echo "──────────────────────────────────────────"
 
 echo "▶ forge build"

@@ -1,6 +1,10 @@
 /**
  * Frontend mirror of the on-chain bonding-curve math.
  * Constants MUST stay in sync with contracts/src/BondingCurve.sol.
+ *
+ * AUDIT-FIX: All three curve shapes now use the same constant-product invariant
+ * (x·y=k) per the contract audit fix. The selector determines initial reserve
+ * ratios only; buy/sell math is symmetric for every shape.
  */
 
 export enum CurveShape {
@@ -21,7 +25,6 @@ export const VIRTUAL_TOKEN_EXP_BASE = 1_073_000_000n * 10n ** 18n;
 
 const ONE_B = 1_000_000_000n * 10n ** 18n;
 const WAD = 10n ** 18n;
-const WAD2 = 10n ** 36n;
 
 export interface CurveReserves {
   realToken: bigint;
@@ -49,30 +52,6 @@ export function realReservesForTier(tier: number): bigint {
   return BASE_REAL_TOKEN_PER_1B * tierMultiplier(tier);
 }
 
-export function sqrt1e36(x: bigint): bigint {
-  if (x === 0n) return 0n;
-  const scaled = x / WAD;
-  return sqrt1e18(scaled);
-}
-
-export function sqrt1e18(x: bigint): bigint {
-  if (x === 0n) return 0n;
-  let z = (x / WAD + 1n) / 2n * WAD;
-  let y = x;
-  for (let i = 0; i < 40; i++) {
-    if (z >= y) break;
-    y = z;
-    z = (x * WAD) / z + z / 2n;
-  }
-  return y;
-}
-
-export function pow1_5(x: bigint): bigint {
-  if (x === 0n) return 0n;
-  if (x === WAD) return WAD;
-  return (x * sqrt1e18(x)) / WAD;
-}
-
 export function currentFee(creationBlock: bigint, currentBlock: bigint): bigint {
   const elapsed = currentBlock - creationBlock;
   const BASE_FEE = 125n * 10n ** 14n;
@@ -85,24 +64,14 @@ export function currentFee(creationBlock: bigint, currentBlock: bigint): bigint 
 export function getBuyOut(r: CurveReserves, quoteIn: bigint): { tokensOut: bigint; fee: bigint } {
   const fee = currentFee(r.creationBlock, r.currentBlock);
   const quoteAfterFee = quoteIn - (quoteIn * fee) / WAD;
-  const tokens = buyTokenOut(r, quoteAfterFee);
+  const tokens = buyTokenOut(r.virtualToken, r.virtualQuote, quoteAfterFee);
   return { tokensOut: tokens, fee };
 }
 
-function buyTokenOut(r: CurveReserves, quoteIn: bigint): bigint {
-  const vq = r.virtualQuote + quoteIn;
-  if (r.curveShape === CurveShape.LINEAR) {
-    const ratio = (r.virtualQuote * WAD2) / vq;
-    const sq = sqrt1e18(ratio / WAD);
-    return (r.virtualToken * (WAD - sq)) / WAD;
-  }
-  if (r.curveShape === CurveShape.EXPONENTIAL) {
-    const ratio = (r.virtualQuote * WAD) / vq;
-    return (r.virtualToken * (WAD - ratio)) / WAD;
-  }
-  const ratio = (r.virtualQuote * WAD) / vq;
-  const p = pow1_5(ratio);
-  return (r.virtualToken * (WAD - p)) / WAD;
+function buyTokenOut(vToken: bigint, vQuote: bigint, quoteIn: bigint): bigint {
+  const newVQuote = vQuote + quoteIn;
+  const tokenOut = (vToken * quoteIn) / newVQuote;
+  return tokenOut >= vToken ? vToken - 1n : tokenOut;
 }
 
 export function getSellOut(
@@ -110,25 +79,15 @@ export function getSellOut(
   tokensIn: bigint,
 ): { grossQuoteOut: bigint; fee: bigint; netQuoteOut: bigint } {
   const fee = currentFee(r.creationBlock, r.currentBlock);
-  const grossQuoteOut = sellQuoteOut(r, tokensIn);
+  const grossQuoteOut = sellQuoteOut(r.virtualQuote, r.virtualToken, tokensIn);
   const netQuoteOut = grossQuoteOut - (grossQuoteOut * fee) / WAD;
   return { grossQuoteOut, fee, netQuoteOut };
 }
 
-function sellQuoteOut(r: CurveReserves, tokensIn: bigint): bigint {
-  const vt = r.virtualToken + tokensIn;
-  if (r.curveShape === CurveShape.LINEAR) {
-    const ratio = (r.virtualToken * WAD) / vt;
-    const sq = (ratio * ratio) / WAD;
-    return (r.virtualQuote * (WAD - sq)) / WAD;
-  }
-  if (r.curveShape === CurveShape.EXPONENTIAL) {
-    const ratio = (r.virtualToken * WAD) / vt;
-    return (r.virtualQuote * (WAD - ratio)) / WAD;
-  }
-  const ratio = (r.virtualToken * WAD) / vt;
-  const p = pow1_5(ratio);
-  return (r.virtualQuote * (WAD - p)) / WAD;
+function sellQuoteOut(vQuote: bigint, vToken: bigint, tokensIn: bigint): bigint {
+  const newVToken = vToken + tokensIn;
+  const quoteOut = (vQuote * tokensIn) / newVToken;
+  return quoteOut >= vQuote ? vQuote - 1n : quoteOut;
 }
 
 export function price(r: CurveReserves): bigint {

@@ -58,7 +58,18 @@ export function createApp(): express.Express {
   // Error handler
   app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     logger.error({ err }, "Unhandled API error");
-    res.status(500).json({ error: "Internal server error" });
+    // Handle Prisma errors more gracefully
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    // Circuit breaker open or load shedding
+    if (errorMessage.includes("CIRCUIT_OPEN") || errorMessage.includes("LOAD_SHEDDING")) {
+      res.status(503).json({ error: "Service temporarily unavailable", message: "The backend is overloaded or experiencing issues. Please retry in a moment." });
+    } else if (errorMessage.includes("database") || errorMessage.includes("connection") || errorMessage.includes("timeout")) {
+      res.status(503).json({ error: "Service temporarily unavailable", message: "Please try again in a moment." });
+    } else if (errorMessage.includes("not found") || errorMessage.includes("not exist")) {
+      res.status(404).json({ error: "Resource not found" });
+    } else {
+      res.status(500).json({ error: "Internal server error", message: errorMessage });
+    }
   });
 
   return app;

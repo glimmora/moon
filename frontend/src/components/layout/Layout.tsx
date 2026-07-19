@@ -37,19 +37,21 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* Main content — z-10 to stay above background */}
       <div className="relative z-10 flex flex-col flex-1">
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-28 md:pb-12 pt-2">
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col pb-8 md:pb-14 pt-2">
+          <div className="flex-1 min-h-0" />
           <PageTransition>{children}</PageTransition>
+          <div className="flex-1 min-h-0" />
         </main>
         <footer className={cn(
           "relative z-10 mt-auto border-t py-6",
           isLight ? "border-neutral-200" : "border-white/[0.06]",
-        )}>
+        )} style={{ paddingBottom: "calc(84px + env(safe-area-inset-bottom))" }}>
           <div className={cn(
             "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs",
             isLight ? "text-neutral-500" : "text-neutral-500",
           )}>
             <p>
-              moon.fun — permissionless meme-token launchpad.{" "}
+              Moon — permissionless meme-token launchpad.{" "}
               <a
                 href="https://github.com/glimmora/moon"
                 className={isLight ? "text-moon-600 hover:text-moon-700 hover:underline" : "text-moon-400 hover:text-moon-300 hover:underline"}

@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { useToast } from "@/stores/toast";
 
 /**
- * Referral link component. Generates a moon.fun referral URL tied to the connected
+ * Referral link component. Generates a Moon referral URL tied to the connected
  * wallet and lets the user copy it. The link encodes the referrer address in a query
  * param that the backend resolves into a permanent on-chain referrer link via
  * ReferralRegistry.setReferrer().
@@ -59,14 +59,14 @@ export function ReferralLink() {
     // Prefer the native share sheet on supported devices; fall back to Twitter.
     if (navigator.share) {
       try {
-        await navigator.share({ title: "moon.fun", text: "Launch your meme token on moon.fun 🌙", url: link });
+        await navigator.share({ title: "Moon", text: "Launch your meme token on Moon 🌙", url: link });
         return;
       } catch {
         return; // user cancelled — no error toast
       }
     }
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent("Launch your meme token on moon.fun 🌙")}&url=${encodeURIComponent(link)}`,
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent("Launch your meme token on Moon 🌙")}&url=${encodeURIComponent(link)}`,
       "_blank",
       "noreferrer",
     );

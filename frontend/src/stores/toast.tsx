@@ -121,7 +121,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {/* Toast container — polite for status, assertive announcements handled per-item. */}
       <div
-        className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm pointer-events-none"
+        className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 max-w-sm pointer-events-none safe-bottom"
         aria-live="polite"
         aria-relevant="additions text"
       >
@@ -153,7 +153,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   return (
     <div
       className={cn(
-        "pointer-events-auto flex items-start gap-3 rounded-xl border bg-ink-900/95 backdrop-blur-xl p-4 shadow-xl animate-slide-up",
+        "pointer-events-auto flex items-start gap-3 rounded-xl border bg-[var(--bg-elev)] backdrop-blur-xl p-4 shadow-xl animate-slide-up",
         borderMap[toast.type],
       )}
       style={{ willChange: "transform, opacity" }}
@@ -162,9 +162,9 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
     >
       <div className="shrink-0 mt-0.5">{iconMap[toast.type]}</div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-neutral-100">{toast.title}</p>
+        <p className="text-sm font-semibold text-[var(--text-primary)]">{toast.title}</p>
         {toast.description && (
-          <p className="mt-0.5 text-xs text-neutral-400 break-words">{toast.description}</p>
+          <p className="mt-0.5 text-xs text-[var(--text-secondary)] break-words">{toast.description}</p>
         )}
         {action && (
           action.href ? (
@@ -172,7 +172,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
               href={action.href}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 inline-flex items-center gap-1 rounded-lg bg-white/[0.06] px-2.5 py-1 text-xs font-medium text-moon-300 hover:bg-white/[0.1] transition-colors"
+              className="mt-2 inline-flex items-center gap-1 rounded-lg bg-[var(--surface-2)] px-2.5 py-1 text-xs font-medium text-moon-300 hover:bg-[var(--surface-3)] transition-colors"
             >
               {action.label}
             </a>
@@ -182,7 +182,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
                 const keep = action.onClick();
                 if (!keep) onDismiss();
               }}
-              className="mt-2 inline-flex items-center gap-1 rounded-lg bg-white/[0.06] px-2.5 py-1 text-xs font-medium text-moon-300 hover:bg-white/[0.1] transition-colors"
+              className="mt-2 inline-flex items-center gap-1 rounded-lg bg-[var(--surface-2)] px-2.5 py-1 text-xs font-medium text-moon-300 hover:bg-[var(--surface-3)] transition-colors"
             >
               {action.label}
             </button>
@@ -191,7 +191,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
       </div>
       <button
         onClick={onDismiss}
-        className="shrink-0 rounded-lg p-1 text-neutral-500 hover:bg-white/[0.06] hover:text-neutral-300 transition-colors"
+        className="shrink-0 rounded-lg p-1 text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--text-secondary)] transition-colors"
         aria-label="Dismiss notification"
       >
         <X className="h-3.5 w-3.5" />

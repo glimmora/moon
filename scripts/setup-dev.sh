@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# moon.fun — one-shot developer setup.
+# Moon — one-shot developer setup.
 # Installs Node deps, Foundry deps, spins up Postgres, pushes the schema.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-echo "🌙 moon.fun dev setup"
+echo "🌙 Moon dev setup"
 echo "──────────────────────────────────────────"
 
 # 1. Node deps

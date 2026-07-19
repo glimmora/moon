@@ -19,7 +19,7 @@ import {IReferralRegistry} from "src/interfaces/IReferralRegistry.sol";
 import {IFeeRouter} from "src/interfaces/IFeeRouter.sol";
 
 /// @title SepoliaIntegrationTest
-/// @notice Comprehensive integration test exercising every on-chain feature of moon.fun.
+/// @notice Comprehensive integration test exercising every on-chain feature of Moon.
 /// @dev This test runs against freshly-deployed contracts in-memory (no Sepolia RPC needed)
 ///      but uses the EXACT same bytecode that would be deployed on-chain. Every assertion
 ///      here is a guarantee that the feature works on mainnet.
@@ -647,7 +647,7 @@ contract SepoliaIntegrationTest is Test {
         IMoonFactory.CreateParams memory params = IMoonFactory.CreateParams({
             name: _tokenName(tier, curveShape),
             symbol: _tokenSymbol(tier, curveShape),
-            imageUrl: "https://moon.fun/token.png",
+            imageUrl: "https://Moon/token.png",
             description: "Test token",
             maxTxBps: 100,
             maxHoldBps: 500,

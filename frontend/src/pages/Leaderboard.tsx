@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import { Link } from "react-router-dom";
 import { Trophy, Users, Coins, Flame, Crown, Medal, ArrowUpRight, Loader2 } from "lucide-react";
-import { formatUsd, shortenAddress, formatMarketCap, timeAgo } from "@/lib/format";
+import { formatUsd, shortenAddress, formatMarketCap, timeAgo, formatPriceUsd } from "@/lib/format";
 import { chainMeta } from "@/config/chains";
 import { cn } from "@/lib/cn";
 import { ErrorState } from "@/components/feedback/ErrorState";
+import { Tabs } from "@/components/ui/Tabs";
+import { Avatar } from "@/components/ui/Avatar";
 
 type Tab = "traders" | "creators" | "tokens";
 
@@ -36,9 +38,9 @@ export function Leaderboard() {
   });
 
   const tabs = [
-    { key: "traders" as const, label: "Top Traders", icon: Trophy },
-    { key: "creators" as const, label: "Top Creators", icon: Users },
-    { key: "tokens" as const, label: "Top Tokens", icon: Coins },
+    { key: "traders" as const, label: <><span className="hidden sm:inline">Top Traders</span><span className="sm:hidden">Traders</span></>, icon: Trophy },
+    { key: "creators" as const, label: <><span className="hidden sm:inline">Top Creators</span><span className="sm:hidden">Creators</span></>, icon: Users },
+    { key: "tokens" as const, label: <><span className="hidden sm:inline">Top Tokens</span><span className="sm:hidden">Tokens</span></>, icon: Coins },
   ];
 
   return (
@@ -49,32 +51,11 @@ export function Leaderboard() {
           <Trophy className="h-7 w-7 text-white" />
         </div>
         <h1 className="text-3xl font-bold font-display">Leaderboard</h1>
-        <p className="mt-2 text-neutral-400">The moon.fun hall of fame — top traders, creators, and tokens.</p>
+        <p className="mt-2 text-neutral-400">The Moon hall of fame — top traders, creators, and tokens.</p>
       </div>
 
       {/* Tab switcher */}
-      <div role="tablist" aria-label="Leaderboard category" className="flex gap-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1 max-w-md mx-auto">
-        {tabs.map((t) => {
-          const active = tab === t.key;
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all",
-                active ? "bg-white/[0.08] text-white shadow-inner-glow" : "text-neutral-400 hover:text-neutral-200",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="hidden sm:inline">{t.label}</span>
-              <span className="sm:hidden">{t.label.split(" ")[1]}</span>
-            </button>
-          );
-        })}
-      </div>
+      <Tabs tabs={tabs} value={tab} onChange={(k) => setTab(k as Tab)} ariaLabel="Leaderboard category" centered />
 
       {/* Traders */}
       {tab === "traders" && (
@@ -109,7 +90,7 @@ export function Leaderboard() {
       {/* Tokens */}
       {tab === "tokens" && (
         <>
-          <div role="tablist" aria-label="Sort tokens by" className="flex justify-center gap-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-1 max-w-sm mx-auto">
+          <div role="tablist" aria-label="Sort tokens by" className="flex justify-center gap-1 rounded-xl bg-[var(--surface-2)] border border-[var(--border-subtle)] p-1 max-w-sm mx-auto">
             {(["volume", "holders", "marketcap"] as const).map((s) => (
               <button
                 key={s}
@@ -118,7 +99,7 @@ export function Leaderboard() {
                 onClick={() => setTokenSort(s)}
                 className={cn(
                   "flex-1 rounded-lg py-1.5 text-xs font-medium capitalize transition-all",
-                  tokenSort === s ? "bg-moon-500/20 text-moon-300 shadow-glow" : "text-neutral-400 hover:text-neutral-200",
+                  tokenSort === s ? "bg-moon-500/20 text-moon-300 shadow-glow" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
                 )}
               >
                 {s === "marketcap" ? "Mkt Cap" : s}
@@ -182,7 +163,7 @@ function LeaderboardTable<T>({
     <div className="card-elevated overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-white/[0.02] text-xs text-neutral-500 uppercase tracking-wider">
+          <thead className="bg-[var(--surface-2)] text-xs text-[var(--text-muted)] uppercase tracking-wider">
             <tr>
               {columns.map((c, i) => (
                 <th key={c} scope="col" className={cn("px-4 py-3 font-medium", i === 0 ? "text-left w-16" : i === 1 ? "text-left" : "text-right")}>
@@ -191,7 +172,7 @@ function LeaderboardTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/[0.04]">
+          <tbody className="divide-y divide-[var(--border-subtle)]">
             {data.map((row) => renderRow(row))}
           </tbody>
         </table>
@@ -202,14 +183,14 @@ function LeaderboardTable<T>({
 
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1) return <Crown className="h-4 w-4 text-amber-400" />;
-  if (rank === 2) return <Medal className="h-4 w-4 text-neutral-300" />;
+  if (rank === 2) return <Medal className="h-4 w-4 text-[var(--text-secondary)]" />;
   if (rank === 3) return <Medal className="h-4 w-4 text-orange-400" />;
-  return <span className="tabular text-neutral-500">{rank}</span>;
+  return <span className="tabular text-[var(--text-muted)]">{rank}</span>;
 }
 
 function TradersRow({ row }: { row: { rank: number; address: string; volumeUsd: number; trades: number } }) {
   return (
-    <tr className="hover:bg-white/[0.02] transition-colors">
+    <tr className="hover:bg-[var(--surface-2)] transition-colors">
       <td className="px-4 py-3"><div className="flex items-center gap-1.5"><RankBadge rank={row.rank} /></div></td>
       <td className="px-4 py-3">
         <Link to={`/portfolio/${row.address}`} className="font-mono text-moon-400 hover:underline">
@@ -217,14 +198,14 @@ function TradersRow({ row }: { row: { rank: number; address: string; volumeUsd: 
         </Link>
       </td>
       <td className="px-4 py-3 text-right font-semibold tabular">{formatUsd(row.volumeUsd)}</td>
-      <td className="px-4 py-3 text-right tabular text-neutral-400">{row.trades.toLocaleString()}</td>
+      <td className="px-4 py-3 text-right tabular text-[var(--text-secondary)]">{row.trades.toLocaleString()}</td>
     </tr>
   );
 }
 
 function CreatorsRow({ row }: { row: { rank: number; address: string; tokensCreated: number; totalVolume24h: number; totalHolders: number } }) {
   return (
-    <tr className="hover:bg-white/[0.02] transition-colors">
+    <tr className="hover:bg-[var(--surface-2)] transition-colors">
       <td className="px-4 py-3"><RankBadge rank={row.rank} /></td>
       <td className="px-4 py-3">
         <Link to={`/portfolio/${row.address}`} className="font-mono text-moon-400 hover:underline">
@@ -233,7 +214,7 @@ function CreatorsRow({ row }: { row: { rank: number; address: string; tokensCrea
       </td>
       <td className="px-4 py-3 text-right tabular">{row.tokensCreated}</td>
       <td className="px-4 py-3 text-right font-semibold tabular">{formatUsd(row.totalVolume24h)}</td>
-      <td className="px-4 py-3 text-right tabular text-neutral-400">{row.totalHolders.toLocaleString()}</td>
+      <td className="px-4 py-3 text-right tabular text-[var(--text-secondary)]">{row.totalHolders.toLocaleString()}</td>
     </tr>
   );
 }
@@ -250,15 +231,12 @@ function TokenRankCard({ token }: { token: { rank: number; chainId: number; addr
           <div className="absolute -top-1 -left-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-moon-gradient text-[10px] font-bold text-white shadow-glow">
             {token.rank}
           </div>
-          <div className="h-12 w-12 overflow-hidden rounded-full border border-white/[0.08] bg-ink-900">
-            {token.imageUrl ? (
-              <img src={token.imageUrl} alt={token.name} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-sm font-bold text-gradient">
-                {token.symbol.slice(0, 2)}
-              </div>
-            )}
-          </div>
+          <Avatar
+            src={token.imageUrl}
+            alt={token.name}
+            size={48}
+            className="border border-[var(--border-subtle)]"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -277,15 +255,15 @@ function TokenRankCard({ token }: { token: { rank: number; chainId: number; addr
       <div className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
         <div>
           <p className="text-neutral-500 text-[10px] uppercase">Price</p>
-          <p className="font-semibold tabular">${token.priceUsd.toFixed(6)}</p>
+          <p className="font-semibold tabular truncate">{formatPriceUsd(token.priceUsd)}</p>
         </div>
         <div>
           <p className="text-neutral-500 text-[10px] uppercase">Mkt Cap</p>
-          <p className="font-semibold tabular">{formatMarketCap(token.marketCapUsd)}</p>
+          <p className="font-semibold tabular truncate">{formatMarketCap(token.marketCapUsd)}</p>
         </div>
         <div>
           <p className="text-neutral-500 text-[10px] uppercase">Holders</p>
-          <p className="font-semibold tabular">{token.holderCount.toLocaleString()}</p>
+          <p className="font-semibold tabular truncate">{token.holderCount.toLocaleString()}</p>
         </div>
       </div>
     </Link>

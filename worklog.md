@@ -1,9 +1,9 @@
-# moon.fun — Multi-Agent Worklog
+# Moon — Multi-Agent Worklog
 
 ---
 Task ID: audit-final-v2
 Agent: Senior Smart Contract Security Auditor (main agent)
-Task: Full security audit of moon.fun repo (smart contracts + frontend + backend + integration), auto-fix findings, push to GitHub.
+Task: Full security audit of Moon repo (smart contracts + frontend + backend + integration), auto-fix findings, push to GitHub.
 
 Work Log:
 - Read 8 smart contract source files: MoonToken, BondingCurve, MoonFactory, FeeRouter, MoonBurner, CreatorFeeVault, ReferralRegistry, MoonV3Concentrator

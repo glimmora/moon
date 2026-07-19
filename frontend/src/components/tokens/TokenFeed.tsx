@@ -1,16 +1,28 @@
 import { useTokens } from "@/hooks/useTokens";
 import { TokenCard } from "./TokenCard";
+import { TokenRow } from "./TokenRow";
 import { useNetworkMode } from "@/stores/networkMode";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Flame, Clock, TrendingUp, Crown, WifiOff, Rocket } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Link } from "react-router-dom";
-import { formatMarketCap, shortenAddress } from "@/lib/format";
+import { formatMarketCap, shortenAddress, formatPriceUsd } from "@/lib/format";
 import { chainMeta } from "@/config/chains";
 import { useTheme } from "@/stores/theme";
+import { Avatar } from "@/components/ui/Avatar";
+import { Tabs } from "@/components/ui/Tabs";
+import { ViewToggle } from "@/components/ui/ViewToggle";
+import { Pagination } from "@/components/ui/Pagination";
+import { useListPrefs } from "@/hooks/useListPrefs";
 
 type Sort = "trending" | "new" | "graduated";
+
+const feedTabs = [
+  { key: "trending" as const, label: <span className="hidden sm:inline">Trending</span>, icon: TrendingUp },
+  { key: "new" as const, label: <span className="hidden sm:inline">New</span>, icon: Clock },
+  { key: "graduated" as const, label: <span className="hidden sm:inline">Graduated</span>, icon: Flame },
+];
 
 export function TokenFeed() {
   const { mode } = useNetworkMode();
@@ -18,6 +30,8 @@ export function TokenFeed() {
   const { theme } = useTheme();
   const isLight = theme === "light";
   const [sort, setSort] = useState<Sort>("new");
+  const { view, setView, pageSize, setPageSize } = useListPrefs();
+  const [page, setPage] = useState(1);
 
   // useTokens now auto-falls back to on-chain reads if backend is offline
   const { data, isLoading, isError } = useTokens();
@@ -30,6 +44,15 @@ export function TokenFeed() {
     else list.sort((a, b) => b.volume24h - a.volume24h);
     return list;
   }, [data, sort]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [sort, pageSize]);
+
+  const paged = useMemo(
+    () => sorted.slice((page - 1) * pageSize, page * pageSize),
+    [sorted, page, pageSize],
+  );
 
   // Trending spotlight — top token
   const spotlight = useMemo(() => {
@@ -51,22 +74,16 @@ export function TokenFeed() {
             <Crown className="h-3.5 w-3.5" />
             Trending #1
           </div>
-          <div className="relative flex items-center gap-4">
-            <div className="relative shrink-0">
-              <div className="absolute inset-0 rounded-2xl bg-moon-gradient opacity-40 blur-lg group-hover:opacity-60 transition-opacity" />
-               <div className={cn(
-                 "relative h-16 w-16 sm:h-20 sm:w-20 overflow-hidden rounded-2xl border bg-ink-900",
-                 isLight ? "border-neutral-200" : "border-white/[0.1]",
-               )}>
-                 {spotlight.imageUrl ? (
-                  <img src={spotlight.imageUrl} alt={spotlight.name} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xl font-bold text-gradient">
-                    {spotlight.symbol.slice(0, 2)}
-                  </div>
-                )}
-              </div>
-            </div>
+           <div className="relative flex items-center gap-4">
+             <div className="relative shrink-0">
+               <div className="absolute inset-0 rounded-2xl bg-moon-gradient opacity-40 blur-lg group-hover:opacity-60 transition-opacity" />
+               <Avatar
+                 src={spotlight.imageUrl}
+                 alt={spotlight.name}
+                 size={80}
+                 className={cn(isLight ? "border-neutral-200" : "border-white/[0.1]")}
+               />
+             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-xl sm:text-2xl font-bold font-display truncate">{spotlight.name}</h3>
@@ -77,14 +94,14 @@ export function TokenFeed() {
                  by <span className="font-mono">{shortenAddress(spotlight.creator)}</span> ·{" "}
                  {spotlight.holderCount.toLocaleString()} holders
                </p>
-               <div className="mt-2 flex items-center gap-4 text-sm">
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                  <div>
                    <span className="text-neutral-500 text-xs">Mkt Cap </span>
                    <span className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>{formatMarketCap(spotlight.marketCapUsd)}</span>
                  </div>
                  <div>
                    <span className="text-neutral-500 text-xs">Price </span>
-                   <span className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>${spotlight.priceUsd.toFixed(6)}</span>
+                   <span className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>{formatPriceUsd(spotlight.priceUsd)}</span>
                  </div>
                  <div className={cn("font-semibold flex items-center gap-0.5", isLight ? "text-neutral-600" : "text-neutral-400")}>
                    <span className="tabular text-xs">Vol ${spotlight.volume24h.toLocaleString()}</span>
@@ -96,45 +113,19 @@ export function TokenFeed() {
       )}
 
       {/* Tabs + grid */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-semibold font-display">
           {mode === "mainnet" ? "Live Tokens" : "Testnet Tokens"}
         </h2>
-        <div className={cn(
-          "flex gap-1 rounded-xl border p-1",
-          isLight ? "bg-neutral-100 border-neutral-200" : "bg-white/[0.04] border-white/[0.06]",
-        )}>
-          {(
-            [
-              { key: "trending" as const, label: "Trending", icon: TrendingUp },
-              { key: "new" as const, label: "New", icon: Clock },
-              { key: "graduated" as const, label: "Graduated", icon: Flame },
-            ]
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setSort(tab.key)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 ease-smooth active:scale-95",
-                sort === tab.key
-                  ? isLight
-                    ? "bg-white text-neutral-900 shadow-inner-glow"
-                    : "bg-white/[0.08] text-white shadow-inner-glow"
-                  : isLight
-                    ? "text-neutral-500 hover:text-neutral-900"
-                    : "text-neutral-400 hover:text-neutral-200",
-              )}
-            >
-              <tab.icon className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{tab.label}</span>
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <ViewToggle value={view} onChange={setView} />
+          <Tabs tabs={feedTabs} value={sort} onChange={(k) => setSort(k as Sort)} ariaLabel="Sort tokens" />
         </div>
       </div>
 
       {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: Math.min(pageSize, 6) }).map((_, i) => (
             <div key={i} className="shimmer h-52" />
           ))}
         </div>
@@ -160,14 +151,28 @@ export function TokenFeed() {
             Launch Token
           </Link>
         </div>
+      ) : view === "list" ? (
+        <>
+          <div className="space-y-2">
+            {paged.map((t, i) => (
+              <div key={`${t.chainId}-${t.address}`} className="animate-fade-in-up" style={{ animationDelay: `${i * 30}ms` }}>
+                <TokenRow token={t} />
+              </div>
+            ))}
+          </div>
+          <Pagination page={page} pageSize={pageSize} total={sorted.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
+        </>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {sorted.map((t, i) => (
-            <div key={`${t.chainId}-${t.address}`} className="animate-fade-in-up" style={{ animationDelay: `${i * 40}ms` }}>
-              <TokenCard token={t} />
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {paged.map((t, i) => (
+              <div key={`${t.chainId}-${t.address}`} className="animate-fade-in-up" style={{ animationDelay: `${i * 40}ms` }}>
+                <TokenCard token={t} />
+              </div>
+            ))}
+          </div>
+          <Pagination page={page} pageSize={pageSize} total={sorted.length} onPageChange={setPage} onPageSizeChange={setPageSize} />
+        </>
       )}
     </section>
   );

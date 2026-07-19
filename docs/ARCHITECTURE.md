@@ -1,8 +1,8 @@
-# moon.fun — Architecture
+# Moon — Architecture
 
 ## 1. System overview
 
-`moon.fun` is a permissionless meme-token launchpad. Anyone deploys an ERC-20 token
+`Moon` is a permissionless meme-token launchpad. Anyone deploys an ERC-20 token
 against an on-chain bonding curve; the curve mints on buy and burns on sell. When the
 token's market cap reaches the graduation threshold, the curve seeds a Uniswap V2 pool
 and burns the LP — graduating the token to permissionless DEX trading.

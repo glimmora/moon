@@ -9,6 +9,7 @@ import { wagmiConfig } from "@/config/wagmi";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import { NetworkModeProvider } from "@/stores/networkMode";
 import { ThemeProvider, useTheme } from "@/stores/theme";
+import { I18nProvider } from "@/stores/i18n";
 import { ToastProvider } from "@/stores/toast";
 import { WalletEventsWatcher } from "@/components/WalletEventsWatcher";
 import { E2EAutoConnect } from "@/components/E2EAutoConnect";
@@ -67,6 +68,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <QueryClientProvider client={queryClient}>
         <ErrorBoundary>
           <ThemeProvider>
+            <I18nProvider>
             <RainbowKitWithTheme>
               <ToastProvider>
                 <NetworkModeProvider>
@@ -78,6 +80,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 </NetworkModeProvider>
               </ToastProvider>
             </RainbowKitWithTheme>
+            </I18nProvider>
           </ThemeProvider>
         </ErrorBoundary>
       </QueryClientProvider>

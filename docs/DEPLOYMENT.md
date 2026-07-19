@@ -1,4 +1,4 @@
-# moon.fun — Deployment Guide
+# Moon — Deployment Guide
 
 ## Prerequisites
 
@@ -40,7 +40,7 @@ forge script script/DeployMoonToken.s.sol \
 
 Record the deployed address in `CHAIN_MOON_TOKEN_ETHEREUM_SEPOLIA` (and per-chain equivalents).
 
-## 4. Deploy the moon.fun system
+## 4. Deploy the Moon system
 
 The `Deploy.s.sol` script deploys the full system on a chain AND grants the factory
 `DEFAULT_ADMIN_ROLE` on FeeRouter / CreatorFeeVault / ReferralRegistry (so it can grant
@@ -160,7 +160,7 @@ npm run dev
 The backend uses PostgreSQL (required for production and local dev):
 
 ```env
-DB_URL=postgresql://moon:moon@localhost:5432/moonfun
+DB_URL=postgresql://moon:moon@localhost:5432/moon
 ```
 
 The Prisma schema has `provider = "postgresql"` hardcoded. PostgreSQL 16+ is required.

@@ -18,7 +18,7 @@ export function Home() {
     <div className="space-y-12 py-6 animate-fade-in-up">
       {/* Hero */}
       <section className="relative text-center space-y-6 pt-6 sm:pt-10">
-        <div className="inline-flex items-center gap-2 rounded-full border border-moon-500/20 bg-moon-500/10 px-4 py-1.5 text-xs text-moon-200 backdrop-blur-sm animate-fade-in">
+        <div className="inline-flex items-center gap-2 rounded-full border border-moon-500/20 bg-moon-500/10 px-4 py-1.5 text-xs text-moon-300 backdrop-blur-sm animate-fade-in">
           <Sparkles className="h-3 w-3" />
           Multi-chain · 3 curve shapes · Zero pre-mint
         </div>
@@ -28,7 +28,7 @@ export function Home() {
           <span className="text-gradient">moon</span>
           <span className="inline-block ml-2 animate-float">🌙</span>
         </h1>
-        <p className="mx-auto max-w-2xl text-base sm:text-lg text-neutral-400 leading-relaxed">
+        <p className="mx-auto max-w-2xl text-base sm:text-lg text-[var(--text-secondary)] leading-relaxed">
           Permissionless meme-token launchpad with bonding curves, on-chain
           referrals, and a self-sustaining buyback-and-burn flywheel.
         </p>
@@ -87,8 +87,8 @@ export function Home() {
 function StatPill({ value, label, mono }: { value: string; label: string; mono?: boolean }) {
   return (
     <div className="card p-3 text-center">
-      <p className={`text-xl font-bold text-gradient ${mono ? "font-mono text-base" : "tabular"}`}>{value}</p>
-      <p className="mt-0.5 text-[11px] uppercase tracking-wider text-neutral-500">{label}</p>
+      <p className={`text-xl font-bold text-gradient truncate ${mono ? "font-mono text-base" : "tabular"}`}>{value}</p>
+      <p className="mt-0.5 text-[11px] uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
     </div>
   );
 }
@@ -116,7 +116,7 @@ function FeatureCard({
         <Icon className="h-6 w-6" />
       </div>
       <h3 className="font-semibold text-lg font-display">{title}</h3>
-      <p className="mt-2 text-sm text-neutral-400 leading-relaxed">{desc}</p>
+      <p className="mt-2 text-sm text-[var(--text-secondary)] leading-relaxed">{desc}</p>
     </div>
   );
 }

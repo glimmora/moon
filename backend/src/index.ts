@@ -11,7 +11,7 @@ import { prisma } from "./utils/db.js";
 let shutdown: (() => Promise<void>) | null = null;
 
 async function main() {
-  logger.info({ env: env.NODE_ENV, port: env.BACKEND_PORT }, "Starting moon.fun backend");
+  logger.info({ env: env.NODE_ENV, port: env.BACKEND_PORT }, "Starting Moon backend");
 
   const app = createApp();
 

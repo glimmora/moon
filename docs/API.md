@@ -1,4 +1,4 @@
-# moon.fun — Backend API
+# Moon — Backend API
 
 Base URL: `http://localhost:4000` (or your deployed backend).
 

@@ -15,13 +15,13 @@ export function ProgressBar({ value, label, showValue, className, barClassName }
   return (
     <div className={className}>
       {(label || showValue) && (
-        <div className="mb-1 flex items-center justify-between text-[11px] text-neutral-400">
+        <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
           {label && <span>{label}</span>}
           {showValue && <span className="tabular">{clamped.toFixed(1)}%</span>}
         </div>
       )}
       <div
-        className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]"
+        className="h-2 w-full overflow-hidden rounded-full bg-[var(--surface-2)]"
         role="progressbar"
         aria-valuenow={Math.round(clamped)}
         aria-valuemin={0}

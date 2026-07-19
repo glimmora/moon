@@ -18,7 +18,7 @@ function resolveTestDbUrl(): string {
     const f = join(homedir(), ".moon-qa", ".testdburl");
     return readFileSync(f, "utf8").trim();
   } catch {
-    return "postgresql://moon:moon@localhost:5432/moonfun?schema=qa_test";
+    return "postgresql://moon:moon@localhost:5432/moon?schema=qa_test";
   }
 }
 

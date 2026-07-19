@@ -14,7 +14,7 @@ import {ReferralRegistry} from "src/ReferralRegistry.sol";
 import {MoonV3Concentrator} from "src/MoonV3Concentrator.sol";
 
 /// @title DeployScript
-/// @notice Base script that deploys the full moon.fun system on a single chain.
+/// @notice Base script that deploys the full Moon system on a single chain.
 /// @dev Per-chain scripts (DeployBsc, DeployBase, ...) inherit this and set the RPC env.
 abstract contract DeployScript is Script {
     using stdJson for string;

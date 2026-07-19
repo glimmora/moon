@@ -8,7 +8,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IMoonToken} from "src/interfaces/IMoonToken.sol";
 
 /// @title MoonToken
-/// @notice moon.fun ERC-20 token — Option B (mint-on-buy / burn-on-sell).
+/// @notice Moon ERC-20 token — Option B (mint-on-buy / burn-on-sell).
 /// @dev `totalSupply` starts at 0. The bonding curve mints on buy and burns on sell via
 ///      MINTER_ROLE. `s_totalSupplyInit` drives max-tx / max-hold math since the live
 ///      supply is 0 at genesis. This contract intentionally does NOT inherit

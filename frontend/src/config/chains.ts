@@ -1,8 +1,8 @@
 import { type Chain as WagmiChain } from "wagmi/chains";
 
 /**
- * Chain metadata for moon.fun. We define our own chain objects (rather than importing
- * from wagmi/chains) so we can attach the moon.fun-specific `chainMeta` (block explorer,
+ * Chain metadata for Moon. We define our own chain objects (rather than importing
+ * from wagmi/chains) so we can attach the Moon-specific `chainMeta` (block explorer,
  * native symbol, RPC from env, etc.) and keep testnet/mainnet parity.
  */
 

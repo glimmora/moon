@@ -11,6 +11,8 @@ import type { MoonIO } from "../sockets/server.js";
 
 interface IndexerState {
   lastBlock: bigint;
+  // Separate checkpoint for the TokenCreated fast-path (shallower confirmations).
+  lastCreateBlock: bigint;
   running: boolean;
   interval?: ReturnType<typeof setInterval>;
   polling: boolean;
@@ -48,6 +50,15 @@ export async function startChainListener(chain: ChainConfig, io?: MoonIO): Promi
     ? BigInt(checkpoint.lastBlock)
     : await getRecentBlock(client);
 
+  // Resume the TokenCreated fast-path from its own checkpoint (or the same
+  // starting point as the safe-head path on first run).
+  const createCheckpoint = await prisma.indexerCheckpoint.findUnique({
+    where: { id: `factory-create-${chain.chainId}` },
+  });
+  const lastCreateBlock = createCheckpoint?.lastBlock
+    ? BigInt(createCheckpoint.lastBlock)
+    : lastBlock;
+
   // Resolve the referral registry + creator fee vault addresses from the factory so
   // we can index ReferralRecorded / FeesAccrued without extra per-chain env vars.
   let referralRegistry: `0x${string}` | undefined;
@@ -64,7 +75,7 @@ export async function startChainListener(chain: ChainConfig, io?: MoonIO): Promi
     logger.warn({ chainId: chain.chainId, err }, "Could not resolve referral/fee addresses — those events won't be indexed");
   }
 
-  states.set(chain.chainId, { lastBlock, running: true, polling: false, backoffUntil: 0, consecutiveErrors: 0, referralRegistry, creatorFeeVault });
+  states.set(chain.chainId, { lastBlock, lastCreateBlock, running: true, polling: false, backoffUntil: 0, consecutiveErrors: 0, referralRegistry, creatorFeeVault });
   logger.info({ chainId: chain.chainId, lastBlock: lastBlock.toString(), referralRegistry, creatorFeeVault }, "Chain listener started");
 
   // Poll loop with concurrency guard.
@@ -76,6 +87,29 @@ export async function startChainListener(chain: ChainConfig, io?: MoonIO): Promi
     state.polling = true;
     try {
       const head = await client.getBlockNumber();
+
+      // ── TokenCreated fast-path ──────────────────────────────────────
+      // Index new tokens at a shallower confirmation depth so they appear in
+      // lists/detail quickly. Idempotent upserts make this reorg-safe; the
+      // reorg-heal rewind below still re-scans within the safe window.
+      const createConfirmations = BigInt(env.BACKEND_CREATE_CONFIRMATIONS);
+      const createSafeHead = head > createConfirmations ? head - createConfirmations : 0n;
+      if (createSafeHead > state.lastCreateBlock) {
+        const createFrom = state.lastCreateBlock + 1n;
+        const createTo = createSafeHead > createFrom + BigInt(env.BACKEND_MAX_BLOCK_BATCH)
+          ? createFrom + BigInt(env.BACKEND_MAX_BLOCK_BATCH)
+          : createSafeHead;
+        if (createTo >= createFrom) {
+          await pollFactoryEvents(client, chain, createFrom, createTo);
+          await prisma.indexerCheckpoint.upsert({
+            where: { id: `factory-create-${chain.chainId}` },
+            create: { id: `factory-create-${chain.chainId}`, chainId: chain.chainId, eventName: "factory-create", lastBlock: createTo },
+            update: { lastBlock: createTo },
+          });
+          state.lastCreateBlock = createTo;
+        }
+      }
+
       // Confirmation lag: never index newer than (head - CONFIRMATIONS) so that
       // shallow reorgs never surface indexed data we'd have to undo.
       const confirmations = BigInt(env.BACKEND_CONFIRMATIONS);
@@ -180,6 +214,7 @@ async function pollFactoryEvents(
       curveShape: args.curveShape,
       totalSupply: args.totalSupply.toString(),
       creator: getAddress(args.creator),
+      creationBlock: log.blockNumber,
     });
     logger.info({ chainId: chain.chainId, token: args.token, symbol: args.symbol }, "TokenCreated indexed");
   }
@@ -193,7 +228,25 @@ async function pollCurveEvents(
   io?: MoonIO,
 ): Promise<void> {
   const eventDefs = bondingCurveAbi.filter((a) => a.type === "event" && ["Bought", "Sold", "Graduated"].includes(a.name)) as AbiEvent[];
+
+  // Fetch all known curve addresses from the DB first, so getLogs is
+  // scoped to curves we track (avoiding massive unfiltered log queries
+  // across the entire chain that would exceed RPC limits).
+  const knownCurves = await prisma.token.findMany({
+    where: { chainId: chain.chainId, curve: { not: null } },
+    select: { address: true, curve: true },
+  });
+  const knownCurveAddresses = knownCurves.map((t) => getAddress(t.curve!));
+  if (knownCurveAddresses.length === 0) return;
+
+  // Build curve→token lookup from the same DB batch (avoids a second query).
+  const tokensByCurve = new Map<string, { address: string }>();
+  for (const t of knownCurves) {
+    if (t.curve) tokensByCurve.set(t.curve.toLowerCase(), { address: t.address });
+  }
+
   const logs = (await client.getLogs({
+    address: knownCurveAddresses,
     events: eventDefs,
     fromBlock,
     toBlock,
@@ -212,19 +265,6 @@ async function pollCurveEvents(
       } catch { /* skip — fall back to new Date() */ }
     }),
   );
-
-  // Batch-resolve all curve addresses to token records to avoid N+1.
-  const curveAddresses = [...new Set(parsed.map((l) => l.address.toLowerCase()))];
-  const tokensByCurve = new Map<string, { address: string }>();
-  if (curveAddresses.length > 0) {
-    const found = await prisma.token.findMany({
-      where: { chainId: chain.chainId, curve: { in: curveAddresses.map((a) => getAddress(a)) } },
-      select: { address: true, curve: true },
-    });
-    for (const t of found) {
-      if (t.curve) tokensByCurve.set(t.curve.toLowerCase(), t);
-    }
-  }
 
   for (const log of parsed) {
     if (log.eventName === "Bought" || log.eventName === "Sold") {

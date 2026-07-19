@@ -2,11 +2,15 @@ import { useAccount } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/services/api";
 import { ReferralLink } from "@/components/referral/ReferralLink";
-import { Users, TrendingUp, Award, Sparkles } from "lucide-react";
+import { Users, TrendingUp, Award, Sparkles, Link2, Check } from "lucide-react";
 import { formatUsd, shortenAddress } from "@/lib/format";
+import { useReferrerLink } from "@/hooks/useReferrerLink";
+import { useT } from "@/stores/i18n";
 
 export function Referral() {
   const { address } = useAccount();
+  const { canLink, isLinked, pendingReferrer, linkReferrer, isLinking } = useReferrerLink();
+  const t = useT();
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["referral-stats", address],
@@ -21,11 +25,43 @@ export function Referral() {
         <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-moon-gradient shadow-glow mb-3">
           <Users className="h-7 w-7 text-white" />
         </div>
-        <h1 className="text-3xl font-bold font-display">Referral Program</h1>
-        <p className="mt-2 text-neutral-400">Earn 10% of every trade fee from traders you refer — permanently.</p>
+        <h1 className="text-3xl font-bold font-display">{t("referral.title")}</h1>
+        <p className="mt-2 text-neutral-400">{t("referral.subtitle")}</p>
       </div>
 
       <ReferralLink />
+
+      {address && canLink && pendingReferrer && (
+        <div className="card-elevated border-moon-500/20 bg-moon-500/[0.06] p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-moon-500/15 border border-moon-500/20">
+              <Link2 className="h-4 w-4 text-moon-300" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Link your referrer on-chain</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                You arrived via{" "}
+                <span className="font-mono text-moon-300">{shortenAddress(pendingReferrer)}</span>. Confirm the
+                permanent link so their rewards are recorded on-chain.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => linkReferrer()}
+            disabled={isLinking}
+            className="btn-primary shrink-0 text-sm disabled:opacity-60"
+          >
+            {isLinking ? t("referral.linking") : t("referral.linkOnChain")}
+          </button>
+        </div>
+      )}
+
+      {address && isLinked && (
+        <div className="card border-emerald-500/20 bg-emerald-500/[0.06] p-3 flex items-center gap-2 text-sm text-emerald-300">
+          <Check className="h-4 w-4 shrink-0" />
+          {t("referral.linked")}
+        </div>
+      )}
 
       {address && isError && (
         <div className="card border-red-500/20 bg-red-500/[0.06] p-4 text-center text-sm text-red-300" role="alert">
@@ -40,19 +76,19 @@ export function Referral() {
         <div className="grid gap-3 sm:grid-cols-3" aria-live="polite" aria-busy={isLoading}>
           <StatCard
             icon={Users}
-            label="Referrals"
+            label={t("referral.referrals")}
             value={isLoading ? "…" : String(data?.count ?? 0)}
             accent="purple"
           />
           <StatCard
             icon={TrendingUp}
-            label="Total Volume"
+            label={t("referral.totalVolume")}
             value={isLoading ? "…" : formatUsd(Number(data?.volume ?? 0) / 1e18)}
             accent="cyan"
           />
           <StatCard
             icon={Award}
-            label="Rewards Earned"
+            label={t("referral.rewardsEarned")}
             value={isLoading ? "…" : formatUsd(Number(data?.rewards ?? 0) / 1e18)}
             accent="amber"
           />
@@ -68,7 +104,7 @@ export function Referral() {
         <ol className="mt-4 space-y-3 text-sm text-neutral-400">
           <Step n={1}>
             Share your referral link. When a trader clicks it, they permanently link their wallet to you via{" "}
-            <code className="rounded bg-white/[0.06] px-1.5 py-0.5 text-xs font-mono text-moon-300">ReferralRegistry.setReferrer</code>.
+            <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-xs font-mono text-moon-300">ReferralRegistry.setReferrer</code>.
           </Step>
           <Step n={2}>
             Every trade they make accrues{" "}
@@ -81,7 +117,7 @@ export function Referral() {
       </div>
 
       {address && (
-        <p className="text-center text-xs text-neutral-600 font-mono">
+        <p className="text-center text-xs text-[var(--text-muted)] font-mono">
           Connected as {shortenAddress(address)}
         </p>
       )}
@@ -111,7 +147,7 @@ function StatCard({
         <Icon className="h-5 w-5" />
       </div>
       <p className="text-xs uppercase tracking-wider text-neutral-500">{label}</p>
-      <p className="mt-1 text-xl font-bold tabular">{value}</p>
+      <p className="mt-1 text-xl font-bold tabular truncate">{value}</p>
     </div>
   );
 }

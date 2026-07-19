@@ -1,12 +1,17 @@
-import { useState } from "react";
-import { useAccount, useChainId } from "wagmi";
+import { useState, useEffect } from "react";
+import { useAccount, useChainId, useWaitForTransactionReceipt } from "wagmi";
+import { parseEventLogs } from "viem";
 import { useCreateToken, validateCreateForm, type CreateTokenForm } from "@/hooks/useCreateToken";
+import { useTokenIndexing } from "@/hooks/useTokenIndexing";
 import { useNetworkMode } from "@/stores/networkMode";
 import { chainMeta } from "@/config/chains";
 import { TxProgress } from "@/components/tx/TxProgress";
-import { Rocket, Loader2, AlertCircle, CheckCircle2, Image as ImageIcon, SlidersHorizontal, Globe } from "lucide-react";
+import { ProcessingModal } from "@/components/tx/ProcessingModal";
+import { Rocket, Loader2, AlertCircle, Image as ImageIcon, SlidersHorizontal, Globe } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { Link } from "react-router-dom";
+import { Avatar } from "@/components/ui/Avatar";
+import { useQueryClient } from "@tanstack/react-query";
+import { moonFactoryAbi } from "@/abi/MoonFactory";
 
 const DEFAULTS: CreateTokenForm = {
   name: "",
@@ -24,7 +29,7 @@ const TIER_LABELS = ["1B", "10B", "100B"];
 const CURVE_LABELS = ["Linear", "Exponential", "Logarithmic"];
 const CURVE_DESC = [
   "Gentle slope — good for community tokens",
-  "pump.fun style — fast early pumps",
+  "Exponential — rapid early growth",
   "Slower start, steeper late — fair launches",
 ];
 
@@ -37,7 +42,10 @@ export function Create() {
   const chainId = walletChainId || defaultChainId;
   const [form, setForm] = useState<CreateTokenForm>(DEFAULTS);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const { create, lifecycle, pending, error, confirmed } = useCreateToken(chainId);
+  const { create, lifecycle, pending, error, confirmed, lastTxHash } = useCreateToken(chainId);
+
+  // Snapshot of the token being launched (form is reset after submit).
+  const [launched, setLaunched] = useState<{ name: string; symbol: string } | null>(null);
 
   const set = <K extends keyof CreateTokenForm>(key: K, value: CreateTokenForm[K]) => {
     setValidationError(null);
@@ -57,12 +65,72 @@ export function Create() {
     }
     setValidationError(null);
     try {
+      setLaunched({ name: form.name, symbol: form.symbol });
       await create(form);
       setForm(DEFAULTS);
     } catch (e) {
       setValidationError(e instanceof Error ? e.message : "Launch failed.");
+      setLaunched(null);
     }
   }
+
+  // Force refresh token list after successful launch
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (confirmed) {
+      queryClient.invalidateQueries({ queryKey: ["tokens-v3"] });
+      queryClient.invalidateQueries({ queryKey: ["chains"] });
+    }
+  }, [confirmed, queryClient]);
+
+  // ── Indexing: wait for backend to index the newly created token ─────
+  const [tokenAddress, setTokenAddress] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Get full receipt once tx is confirmed, then parse TokenCreated for the address.
+  const txReceipt = useWaitForTransactionReceipt({
+    hash: lastTxHash ?? undefined,
+    chainId,
+    query: { enabled: Boolean(lastTxHash && confirmed && !tokenAddress) },
+  });
+
+  useEffect(() => {
+    if (!txReceipt.data || tokenAddress) return;
+    try {
+      const parsed = parseEventLogs({ abi: moonFactoryAbi, logs: txReceipt.data.logs as never });
+      for (const log of parsed) {
+        if (log.eventName === "TokenCreated") {
+          const args = log.args as unknown as { token: string };
+          setTokenAddress(args.token);
+          setModalOpen(true);
+          break;
+        }
+      }
+    } catch {
+      /* no-op — modal opens on confirm below as a fallback */
+    }
+  }, [txReceipt.data, tokenAddress]);
+
+  // Open the modal as soon as the tx is confirmed, even before we have the address.
+  useEffect(() => {
+    if (confirmed && launched) setModalOpen(true);
+  }, [confirmed, launched]);
+
+  const indexing = useTokenIndexing({
+    chainId,
+    address: tokenAddress,
+    enabled: Boolean(tokenAddress && modalOpen),
+  });
+
+  const resetLaunchFlow = () => {
+    setModalOpen(false);
+    setTokenAddress(null);
+    setLaunched(null);
+    lifecycle.reset?.();
+  };
+
+  // While confirmed but the address isn't parsed yet, treat as "waiting".
+  const modalStatus = indexing.status === "idle" && confirmed ? "waiting" : indexing.status;
 
   const activeChain = chainMeta[chainId];
   // Warn when the wallet is connected but sitting on a chain we don't support
@@ -169,8 +237,8 @@ export function Create() {
                         : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]",
                     )}
                   >
-                    <div>
-                      <div className="text-sm font-semibold">{label}</div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold truncate">{label}</div>
                       <div className="text-[11px] text-neutral-500">{CURVE_DESC[i]}</div>
                     </div>
                     <CurvePreview shape={i} active={form.curveShape === i} />
@@ -185,8 +253,8 @@ export function Create() {
             <Field label="Network">
               <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
                 <Globe className={cn("h-4 w-4", mode === "testnet" ? "text-amber-400" : "text-emerald-400")} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
                     {activeChain?.label ?? `Chain #${chainId}`}
                   </p>
                   <p className="text-[11px] text-neutral-500">
@@ -222,13 +290,13 @@ export function Create() {
                 <span className="ml-auto text-xs text-neutral-500 group-open:rotate-180 transition-transform">▾</span>
               </summary>
               <div className="mt-4 grid gap-5 sm:grid-cols-3">
-                <SliderField label="Max Tx" value={form.maxTxBps} suffix="%" onChange={(v) => set("maxTxBps", v)} min={0} max={500} step={10} />
-                <SliderField label="Max Hold" value={form.maxHoldBps} suffix="%" onChange={(v) => set("maxHoldBps", v)} min={0} max={1000} step={50} />
+                <SliderField label="Max Tx" value={form.maxTxBps} suffix="%" onChange={(v) => set("maxTxBps", v)} min={0} max={10000} step={100} />
+                <SliderField label="Max Hold" value={form.maxHoldBps} suffix="%" onChange={(v) => set("maxHoldBps", v)} min={0} max={10000} step={100} />
                 <SliderField label="Cooldown" value={form.cooldownSeconds} suffix="s" onChange={(v) => set("cooldownSeconds", v)} min={0} max={3600} step={30} />
               </div>
             </details>
 
-            {(validationError || (error && !pending)) && (
+            {!confirmed && !pending && (validationError || (error && !pending)) && (
               <div role="alert" className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-300 animate-fade-in">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span className="break-words">{validationError ?? error}</span>
@@ -248,21 +316,6 @@ export function Create() {
               onRetry={lifecycle.retry}
             />
 
-            {confirmed && !pending && (
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-2 animate-fade-in">
-                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-300">
-                  <CheckCircle2 className="h-5 w-5" />
-                  Token launched successfully! 🎉
-                </div>
-                <p className="text-xs text-emerald-400/70">
-                  {form.name} (${form.symbol}) is now live on {activeChain?.label ?? "the network"}.
-                </p>
-                <Link to="/" className="btn-success w-full !py-2 text-sm mt-2">
-                  View in Dashboard →
-                </Link>
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={pending || !address || unsupportedChain}
@@ -277,10 +330,10 @@ export function Create() {
                   <Loader2 className="h-5 w-5 animate-spin" />
                   Launching…
                 </>
-              ) : confirmed ? (
+              ) : confirmed && modalStatus === "waiting" ? (
                 <>
-                  <CheckCircle2 className="h-5 w-5" />
-                  Launched! Create another?
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Indexing…
                 </>
               ) : (
                 <>
@@ -298,24 +351,16 @@ export function Create() {
             <p className="text-xs uppercase tracking-wider text-neutral-500 font-medium">Live Preview</p>
             <div className="card-elevated p-5">
               <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-full bg-moon-gradient opacity-30 blur-md" />
-                  <div className="relative h-14 w-14 overflow-hidden rounded-full border border-white/[0.1] bg-ink-900">
-                    {form.imageUrl ? (
-                      <img src={form.imageUrl} alt="preview" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-lg font-bold text-gradient">
-                        {(form.symbol || "??").slice(0, 2)}
-                      </div>
-                    )}
-                  </div>
-                </div>
+<div className="relative">
+                <div className="absolute inset-0 rounded-full bg-moon-gradient opacity-30 blur-md" />
+                <Avatar src={form.imageUrl} alt="preview" size={56} shape="circle" />
+              </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="font-bold truncate font-display">{form.name || "Your Token"}</h3>
-                  <p className="text-xs text-neutral-500">${form.symbol || "SYM"}</p>
+                  <p className="text-xs text-[var(--text-muted)]">${form.symbol || "SYM"}</p>
                 </div>
               </div>
-              <p className="mt-3 text-xs text-neutral-400 line-clamp-3 min-h-[3rem]">
+              <p className="mt-3 text-xs text-[var(--text-secondary)] line-clamp-3 min-h-[3rem]">
                 {form.description || "Token description will appear here…"}
               </p>
               <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
@@ -346,6 +391,20 @@ export function Create() {
           </div>
         </div>
       </div>
+
+      <ProcessingModal
+        open={modalOpen}
+        status={modalStatus}
+        tokenName={launched?.name}
+        tokenSymbol={launched?.symbol}
+        chainId={chainId}
+        tokenAddress={tokenAddress}
+        chainLabel={activeChain?.label}
+        explorerUrl={lifecycle.explorerUrl}
+        onClose={resetLaunchFlow}
+        onKeepWaiting={indexing.retry}
+        onCreateAnother={resetLaunchFlow}
+      />
     </div>
   );
 }
@@ -401,8 +460,8 @@ function SliderField({
 
 function PreviewStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-white/[0.03] border border-white/[0.04] p-2">
-      <p className="text-[10px] text-neutral-500 uppercase tracking-wider">{label}</p>
+    <div className="rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] p-2">
+      <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{label}</p>
       <p className="text-sm font-semibold tabular">{value}</p>
     </div>
   );

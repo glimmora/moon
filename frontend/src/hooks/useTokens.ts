@@ -235,7 +235,7 @@ export function useTokenByIndex(chainId: number, index: number) {
   });
 }
 
-const WATCH_KEY = "moon.fun.watchlist";
+const WATCH_KEY = "Moon.watchlist";
 
 export function useWatchlist() {
   const { address } = useAccount();

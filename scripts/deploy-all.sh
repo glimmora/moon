@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# moon.fun — deploy the full system across all configured chains.
+# Moon — deploy the full system across all configured chains.
 # Reads chain list from $MOON_DEPLOY_CHAINS (default: all testnets).
 set -euo pipefail
 
@@ -33,7 +33,7 @@ declare -A RPC=(
   ["ethereum-sepolia"]="CHAIN_ETHEREUM_SEPOLIA_RPC_URL"
 )
 
-echo "🚀 moon.fun multi-chain deploy"
+echo "🚀 Moon multi-chain deploy"
 echo "──────────────────────────────────────────"
 echo "Chains: $CHAINS"
 echo ""

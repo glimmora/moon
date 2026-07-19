@@ -1,4 +1,6 @@
-/** Formatting helpers — all on-chain values use 1e18 fixed point. */
+/**
+ * Formatting helpers — all on-chain values use 1e18 fixed point.
+ */
 import { GRADUATION_THRESHOLDS } from "./curve";
 
 export function formatToken(amount: bigint, decimals = 18, displayDecimals = 2): string {
@@ -12,12 +14,62 @@ export function formatToken(amount: bigint, decimals = 18, displayDecimals = 2):
   return `${wholeStr}.${fracStr}`;
 }
 
+export function formatCompactToken(amount: bigint, decimals = 18): string {
+  if (amount === 0n) return "0";
+  const divisor = 10n ** BigInt(decimals);
+  const whole = amount / divisor;
+  const fraction = amount % divisor;
+  const wholeNum = Number(whole);
+  
+  if (Math.abs(wholeNum) >= 1000) {
+    const fracStr = fraction.toString().padStart(decimals, "0").slice(0, 3);
+    return `${wholeNum.toLocaleString("en-US")}.${fracStr}`;
+  }
+  
+  const fracStr = fraction.toString().padStart(decimals, "0");
+  return `${wholeNum.toLocaleString("en-US")}.${fracStr}`;
+}
+
+const SUBSCRIPT = ["₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"];
+
+function toSubscript(n: number): string {
+  return String(n)
+    .split("")
+    .map((d) => SUBSCRIPT[Number(d)])
+    .join("");
+}
+
 export function formatPrice(quotePerToken: bigint): string {
   const usd = Number(quotePerToken) / 1e18;
   if (usd === 0) return "$0.0000";
-  if (usd < 0.0001) return `$${usd.toExponential(2)}`;
-  if (usd < 1) return `$${usd.toFixed(6)}`;
-  return `$${usd.toFixed(4)}`;
+  if (usd >= 1) return `$${usd.toFixed(4)}`;
+  if (usd >= 0.0001) return `$${usd.toFixed(6)}`;
+  // Very small prices: compress leading zeros using subscript notation, e.g. $0.0₇378
+  const decimals = usd.toFixed(20).split(".")[1] ?? "";
+  const firstNonZero = decimals.search(/[1-9]/);
+  if (firstNonZero < 0) return "$0.0000";
+  const zeros = firstNonZero;
+  const significant = decimals.slice(firstNonZero, firstNonZero + 4).replace(/0+$/, "") || "0";
+  return `$0.0${toSubscript(zeros)}${significant}`;
+}
+
+/**
+ * Human-readable price for a plain USD number (not 1e18 fixed point).
+ * Mirrors `formatPrice`: fixed decimals for larger values, subscript
+ * compression of leading zeros for very small prices (e.g. $0.0₇378).
+ */
+export function formatPriceUsd(usd: number): string {
+  if (!Number.isFinite(usd) || usd === 0) return "$0.0000";
+  const abs = Math.abs(usd);
+  const sign = usd < 0 ? "-" : "";
+  if (abs >= 1) return `${sign}$${abs.toFixed(4)}`;
+  if (abs >= 0.0001) return `${sign}$${abs.toFixed(6)}`;
+  const decimals = abs.toFixed(20).split(".")[1] ?? "";
+  const firstNonZero = decimals.search(/[1-9]/);
+  if (firstNonZero < 0) return "$0.0000";
+  const zeros = firstNonZero;
+  const significant = decimals.slice(firstNonZero, firstNonZero + 4).replace(/0+$/, "") || "0";
+  return `${sign}$0.0${toSubscript(zeros)}${significant}`;
 }
 
 export function formatUsd(usd: number): string {

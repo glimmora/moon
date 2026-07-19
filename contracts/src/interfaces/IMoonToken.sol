@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title IMoonToken
-/// @notice Interface for the moon.fun ERC-20 token (Option B: mint-on-buy / burn-on-sell).
+/// @notice Interface for the Moon ERC-20 token (Option B: mint-on-buy / burn-on-sell).
 /// @dev Inherits IERC20. The factory mints/burns via MINTER_ROLE. totalSupply starts at 0.
 interface IMoonToken is IERC20 {
     /* ─────────────────────────  Errors  ───────────────────────── */

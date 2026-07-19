@@ -1,4 +1,4 @@
-# moon.fun — Security
+# Moon — Security
 
 ## Threat model
 
@@ -78,7 +78,7 @@ The primary adversaries are:
 - **DEX price after graduation** is subject to normal AMM mechanics (impermanent loss,
   sandwich attacks). Use the V3 concentrator (future) for concentrated liquidity.
 - **Creator reputation** is off-chain. DYOR.
-- **Bridge risk** — moon.fun does not bridge tokens across chains; each chain has its own
+- **Bridge risk** — Moon does not bridge tokens across chains; each chain has its own
   factory and token set.
 
 ## Auditing
@@ -87,5 +87,5 @@ See [`AUDIT-CHECKLIST.md`](./AUDIT-CHECKLIST.md) for the pre-audit self-check li
 
 ## Reporting a vulnerability
 
-Email security@moon.fun with a detailed report. We run a responsible disclosure program
+Email security@Moon with a detailed report. We run a responsible disclosure program
 with rewards scaled by severity.

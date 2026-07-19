@@ -8,23 +8,25 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useChainId, useSwitchChain } from "wagmi";
 import { useNetworkMode } from "@/stores/networkMode";
 import { useTheme } from "@/stores/theme";
+import { useI18n, LOCALES, type TranslationKey } from "@/stores/i18n";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
 import { chainMeta } from "@/config/chains";
 import { useEffect, useState, useRef } from "react";
 import { shortenAddress } from "@/lib/format";
 
-const NAV = [
-  { to: "/", label: "Explore", icon: Rocket },
-  { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
-  { to: "/portfolio", label: "Portfolio", icon: Wallet },
-  { to: "/create", label: "Launch", icon: Plus, highlight: true },
-  { to: "/watchlist", label: "Watchlist", icon: Star },
+const NAV: { to: string; labelKey: TranslationKey; icon: typeof Rocket; highlight?: boolean }[] = [
+  { to: "/", labelKey: "nav.discover", icon: Rocket },
+  { to: "/leaderboard", labelKey: "nav.leaderboard", icon: Trophy },
+  { to: "/create", labelKey: "nav.launch", icon: Plus, highlight: true },
 ];
 
 export function Header() {
   const { pathname } = useLocation();
   const { theme, toggle: toggleTheme } = useTheme();
+  const { t, locale, setLocale } = useI18n();
   const { isOnline } = useBackendHealth();
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -38,6 +40,14 @@ export function Header() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) setLangOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
   return (
@@ -64,7 +74,7 @@ export function Header() {
                 "text-base font-bold tracking-tight font-display",
                 theme === "light" ? "text-neutral-900" : "text-neutral-100",
               )}>
-                moon<span className="text-gradient">.fun</span>
+                Mo<span className="text-gradient">on</span>
               </span>
             </div>
           </Link>
@@ -92,7 +102,7 @@ export function Header() {
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               );
             })}
@@ -110,7 +120,7 @@ export function Header() {
             )}
           >
             <Search className="h-4 w-4" />
-            <span className="flex-1 text-left">Search…</span>
+            <span className="flex-1 text-left">{t("common.search")}…</span>
             <kbd className={cn(
               "flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-mono",
               theme === "light" ? "bg-neutral-200 text-neutral-600" : "bg-white/[0.06] text-neutral-400",
@@ -121,6 +131,19 @@ export function Header() {
 
           {/* Right cluster */}
           <div className="ml-auto flex items-center gap-2">
+            {/* Search trigger (mobile / tablet) */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search tokens"
+              className={cn(
+                "lg:hidden btn-ghost text-xs !px-2.5 !py-2",
+                theme === "light" && "hover:bg-neutral-200",
+              )}
+              title="Search tokens"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+
             {/* Backend health dot */}
             <div
               className={cn(
@@ -144,6 +167,52 @@ export function Header() {
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
+
+            {/* Language switcher */}
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setLangOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={langOpen}
+                aria-label={t("common.language")}
+                title={t("common.language")}
+                className={cn(
+                  "btn-ghost text-xs !px-2.5 !py-2 flex items-center gap-1",
+                  theme === "light" && "hover:bg-neutral-200",
+                )}
+              >
+                <Globe className="h-4 w-4" />
+                <span className="uppercase text-[10px] font-semibold">{locale}</span>
+              </button>
+              {langOpen && (
+                <div
+                  role="menu"
+                  aria-label={t("common.language")}
+                  className="absolute top-full right-0 mt-1.5 w-44 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-1)] shadow-xl overflow-hidden z-20 py-1"
+                >
+                  {LOCALES.map((l) => (
+                    <button
+                      key={l.value}
+                      role="menuitem"
+                      onClick={() => {
+                        setLocale(l.value);
+                        setLangOpen(false);
+                      }}
+                      className={cn(
+                        "flex w-full items-center justify-between px-3 py-2 text-sm transition-colors text-left",
+                        locale === l.value
+                          ? "bg-moon-500/15 text-moon-300"
+                          : "text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]",
+                      )}
+                      aria-current={locale === l.value ? "true" : undefined}
+                    >
+                      {l.label}
+                      {locale === l.value && <Check className="h-3.5 w-3.5" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Network + chain selector dropdown */}
             <NetworkDropdown />
@@ -226,8 +295,15 @@ function NetworkDropdown() {
     const onClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   // Find the current chain metadata
@@ -394,9 +470,35 @@ function WalletButton() {
     const onClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
   }, []);
+
+  // Focus trap for keyboard navigation
+  useEffect(() => {
+    if (!open) return;
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      e.preventDefault();
+      const items = Array.from(ref.current?.querySelectorAll<HTMLElement>("a[role=menuitem], button[role=menuitem]") || []);
+      const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+      const nextIndex = e.shiftKey ? currentIndex - 1 : currentIndex + 1;
+      if (nextIndex < 0 || nextIndex >= items.length) {
+        ref.current?.focus();
+      } else {
+        items[nextIndex].focus();
+      }
+    };
+    document.addEventListener("keydown", handleTab);
+    return () => document.removeEventListener("keydown", handleTab);
+  }, [open]);
 
   if (!isConnected || !address) {
     return <ConnectButton showBalance={false} chainStatus="icon" />;
@@ -405,6 +507,8 @@ function WalletButton() {
   const meta = chainId ? chainMeta[chainId] : undefined;
   const menuItems = [
     { to: "/claim", label: "Claim Fees", icon: Gift },
+    { to: "/portfolio", label: "Portfolio", icon: Wallet },
+    { to: "/watchlist", label: "Watchlist", icon: Star },
     { to: "/referral", label: "Referrals", icon: Users },
   ];
 

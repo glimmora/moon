@@ -35,6 +35,11 @@ export interface PortfolioPosition {
   percentage: number;
   graduated: boolean;
   curveShape: number;
+  costBasisUsd: number;
+  avgEntryUsd: number;
+  realizedPnlUsd: number;
+  unrealizedPnlUsd: number;
+  unrealizedPnlPct: number;
 }
 
 export interface PortfolioTrade {
@@ -70,6 +75,10 @@ export interface Portfolio {
   address: string;
   totalValueUsd: number;
   totalVolume: number;
+  totalCostBasisUsd: number;
+  totalUnrealizedPnlUsd: number;
+  totalUnrealizedPnlPct: number;
+  totalRealizedPnlUsd: number;
   tradeCount: number;
   createdCount: number;
   graduatedCount: number;
@@ -120,7 +129,10 @@ async function getJson<T>(path: string): Promise<T> {
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const res = await fetch(`${BASE}${path}`, { signal: controller.signal });
-    if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+    if (!res.ok) {
+      const errorBody = await res.text().catch(() => "");
+      throw new Error(`API ${res.status}: ${res.statusText}${errorBody ? ` - ${errorBody}` : ""}`);
+    }
     return (await res.json()) as T;
   } finally {
     clearTimeout(timer);
@@ -169,6 +181,15 @@ export interface TokenMeta {
   volume24h: number;
 }
 
+export interface OhlcCandle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 export interface Trade {
   txHash: string;
   chainId: number;
@@ -192,6 +213,21 @@ export const api = {
     return normalizeTokenDates(await getJson<TokenMeta>(`/api/tokens/${chainId}/${address}`));
   },
 
+  /** Fetch a token without throwing on 404 — returns null when not found. */
+  async getTokenSafe(chainId: number, address: string): Promise<TokenMeta | null> {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      const res = await fetch(`${BASE}/api/tokens/${chainId}/${address}`, { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      return normalizeTokenDates(await res.json() as TokenMeta);
+    } catch {
+      return null;
+    }
+  },
+
   async getTrades(chainId: number, address: string, limit = 50): Promise<Trade[]> {
     const trades = await getJson<Trade[]>(`/api/tokens/${chainId}/${address}/trades?limit=${limit}`);
     return trades.map((t) => ({ ...t, timestamp: toEpochMs(t.timestamp) }));
@@ -210,6 +246,12 @@ export const api = {
   getPriceHistory(chainId: number, address: string, window = "24h") {
     return getJson<{ time: number; priceUsd: number }[]>(
       `/api/tokens/${chainId}/${address}/prices?window=${window}`,
+    );
+  },
+
+  getOhlc(chainId: number, address: string, window = "24h") {
+    return getJson<OhlcCandle[]>(
+      `/api/tokens/${chainId}/${address}/ohlc?window=${window}`,
     );
   },
 

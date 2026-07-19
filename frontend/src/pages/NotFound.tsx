@@ -19,7 +19,7 @@ export function NotFound() {
         </div>
       </div>
       <h1 className="mt-6 text-6xl font-bold font-display text-gradient">404</h1>
-      <p className="mt-3 text-neutral-400 max-w-sm">
+      <p className="mt-3 text-[var(--text-secondary)] max-w-sm">
         This page drifted into the dark side of the moon.
       </p>
       <Link to="/" className="btn-primary mt-6">
@@ -27,13 +27,13 @@ export function NotFound() {
       </Link>
 
       <nav aria-label="Quick links" className="mt-8 w-full max-w-md">
-        <p className="mb-3 text-xs uppercase tracking-wider text-neutral-600">Or jump to</p>
+        <p className="mb-3 text-xs uppercase tracking-wider text-[var(--text-muted)]">Or jump to</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {QUICK_LINKS.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
               to={to}
-              className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-xs font-medium text-neutral-300 hover:bg-white/[0.05] hover:text-neutral-100 transition-colors"
+              className="flex items-center gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] px-3 py-2.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-3)] hover:text-[var(--text-primary)] transition-colors"
             >
               <Icon className="h-4 w-4 text-moon-400 shrink-0" />
               {label}

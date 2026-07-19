@@ -15,25 +15,25 @@ interface StatProps {
 /** Compact labelled metric with optional icon, trend colour, and info hint. */
 export function Stat({ label, value, icon: Icon, hint, trend, loading, className }: StatProps) {
   return (
-    <div className={cn("rounded-xl border border-white/[0.06] bg-white/[0.02] p-3", className)}>
-      <div className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+    <div className={cn("rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-2)] p-3", className)}>
+      <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
         {Icon && <Icon className="h-3.5 w-3.5" />}
         <span>{label}</span>
         {hint && (
           <Tooltip content={hint}>
-            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-neutral-600 text-[8px] text-neutral-500">
+            <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[var(--border-default)] text-[8px] text-[var(--text-muted)]">
               ?
             </span>
           </Tooltip>
         )}
       </div>
       {loading ? (
-        <div className="mt-1.5 h-5 w-16 animate-pulse rounded bg-white/[0.06]" aria-hidden="true" />
+        <div className="mt-1.5 h-5 w-16 animate-pulse rounded bg-[var(--surface-2)]" aria-hidden="true" />
       ) : (
         <p
           className={cn(
             "mt-1 text-sm font-semibold tabular",
-            trend === "up" ? "text-emerald-400" : trend === "down" ? "text-red-400" : "text-neutral-100",
+            trend === "up" ? "text-emerald-400" : trend === "down" ? "text-red-400" : "text-[var(--text-primary)]",
           )}
         >
           {value}

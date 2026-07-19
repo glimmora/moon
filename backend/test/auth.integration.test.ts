@@ -27,7 +27,7 @@ async function signedLogin() {
   const message = new SiweMessage({
     domain: "localhost",
     address: account.address,
-    statement: "Sign in to moon.fun",
+    statement: "Sign in to Moon",
     uri: "http://localhost:5173",
     version: "1",
     chainId: CHAIN_ID,

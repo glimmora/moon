@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# moon.fun — Dev launcher (frontend + backend)
+# Moon — Dev launcher (frontend + backend)
 # Usage:
 #   ./dev.sh              # start both frontend + backend
 #   ./dev.sh frontend     # frontend only
@@ -102,8 +102,8 @@ start_backend() {
     cat > .env <<'EOF'
 BACKEND_PORT=4000
 NODE_ENV=development
-BACKEND_CORS_ORIGIN=http://localhost:5173
-DB_URL=postgresql://moon:moon@localhost:5432/moonfun
+BACKEND_CORS_ORIGIN=http://152.53.102.150:5173
+DB_URL=postgresql://moon:moon@localhost:5432/moon
 AUTH_JWT_SECRET=dev-secret-change-me-to-a-32-char-minimum-value
 CHAIN_BSC_RPC_URL=https://bsc-dataseed.binance.org
 CHAIN_BASE_RPC_URL=https://mainnet.base.org
@@ -148,7 +148,7 @@ EOF
         echo ""
         echo "${YELLOW}Or create the user + database manually:${NC}"
         echo "     sudo -u postgres psql -c \"CREATE USER moon WITH PASSWORD 'moon';\""
-        echo "     sudo -u postgres psql -c \"CREATE DATABASE moonfun OWNER moon;\""
+        echo "     sudo -u postgres psql -c \"CREATE DATABASE moon OWNER moon;\""
         echo ""
         exit 1
       fi

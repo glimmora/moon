@@ -1,4 +1,4 @@
-# moon.fun — Senior Security Audit Report
+# Moon — Senior Security Audit Report
 
 **Auditor:** Senior Smart Contract Security Auditor (Trail of Bits / OpenZeppelin / Code4rena background)
 **Date:** 2026-07-15
@@ -12,7 +12,7 @@
 
 ## 1. Architecture Overview
 
-moon.fun is a multi-chain EVM meme token launcher inspired by pump.fun, Virtuals Protocol, LetsBonk.fun, and Four.meme. The system comprises:
+Moon is a multi-chain EVM meme token launcher inspired by pump.fun, Virtuals Protocol, LetsBonk.fun, and Four.meme. The system comprises:
 
 ### 1.1 Smart Contracts (Solidity 0.8.24)
 
@@ -774,10 +774,10 @@ No proxies in use. The factory uses EIP-1167 minimal proxies (Clones) for MoonTo
 - **SWC Registry** — SWC-100 (Reentrancy), SWC-105 (Unprotected Ether Withdrawal), SWC-106 (Unprotected SELFDESTRUCT), SWC-107 (Reentrancy), SWC-115 (Authorization through tx.origin), SWC-116 (Block Values as Proxy for Time), SWC-128 (DoS with Block Gas Limit), SWC-131 (Shadowing Variables), SWC-135 (Code with No Effects), SWC-136 (Predictable Randomness).
 
 ### Exploits referenced (2024–2026)
-- Curve (Jul 2024) — Vyper compiler reentrancy lock bug. moon.fun uses Solidity 0.8.24 (not affected).
-- Multichain (Jul 2024) — compromised admin keys. Relevant to moon.fun's admin role model → reinforces TimelockController recommendation.
-- KyberSwap (Nov 2024) — double-counting tick math. Relevant to moon.fun's curve math → reinforces fuzz testing recommendation.
-- Radiant Capital (Oct 2024) — flash-loan-assisted read-only reentrancy. moon.fun's `nonReentrant` on `_update` mitigates.
+- Curve (Jul 2024) — Vyper compiler reentrancy lock bug. Moon uses Solidity 0.8.24 (not affected).
+- Multichain (Jul 2024) — compromised admin keys. Relevant to Moon's admin role model → reinforces TimelockController recommendation.
+- KyberSwap (Nov 2024) — double-counting tick math. Relevant to Moon's curve math → reinforces fuzz testing recommendation.
+- Radiant Capital (Oct 2024) — flash-loan-assisted read-only reentrancy. Moon's `nonReentrant` on `_update` mitigates.
 - Warp (Mar 2025) — missing access control on `__init__`. Directly informed the H-1 finding in this audit.
 
 ### Tools used

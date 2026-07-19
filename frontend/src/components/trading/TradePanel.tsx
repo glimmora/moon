@@ -6,11 +6,12 @@ import { useAccount, useBalance, useReadContract, useBlockNumber } from "wagmi";
 import { moonTokenAbi } from "@/abi/MoonToken";
 import { formatEther, parseEther, type Address } from "viem";
 import { getBuyOut, getSellOut, type CurveReserves, CurveShape } from "@/lib/curve";
-import { formatToken, formatPrice, shortenAddress } from "@/lib/format";
+import { formatToken, formatPrice, shortenAddress, formatCompactToken } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { chainMeta } from "@/config/chains";
 import { useTheme } from "@/stores/theme";
 import { TxProgress } from "@/components/tx/TxProgress";
+import { Badge } from "@/components/ui/Badge";
 import { ArrowDownToLine, ArrowUpFromLine, Loader2, AlertCircle, AlertTriangle, Settings2 } from "lucide-react";
 
 interface TradePanelProps {
@@ -39,19 +40,23 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
   const [showSettings, setShowSettings] = useState(false);
   const [slippage, setSlippage] = useState(1);
 
-  const { data: tokenBalance } = useReadContract({
+  const {
+    data: tokenBalance,
+    isLoading: tokenBalLoading,
+    error: tokenBalError,
+  } = useReadContract({
     abi: moonTokenAbi,
     address: tokenAddress,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     chainId,
-    query: { enabled: Boolean(address) && side === "sell" },
+    query: { enabled: Boolean(address) },
   });
 
   const { data: nativeBalance } = useBalance({
     address,
     chainId,
-    query: { enabled: Boolean(address) && side === "buy" },
+    query: { enabled: Boolean(address) },
   });
 
   // The balance that the percentage slider is expressed against: the user's
@@ -71,7 +76,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
         return;
       }
       const raw = (maxBalance * BigInt(pct)) / 100n;
-      setAmount(raw > 0n ? formatToken(raw) : "");
+      setAmount(raw > 0n ? formatEther(raw) : "");
     },
     [maxBalance],
   );
@@ -102,7 +107,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
   const setMax = useCallback(() => {
     if (!maxBalance) return;
     setSliderValue(100);
-    setAmount(formatToken(maxBalance));
+    setAmount(formatEther(maxBalance));
   }, [maxBalance]);
 
   // Reset the slider when switching sides, since the balance source changes.
@@ -171,8 +176,13 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
     }
   }, [side, amount, tokenBalance]);
 
+  const nativeGasWarning = useMemo(() => {
+    if (side !== "sell" || !address) return false;
+    return nativeBalance !== undefined && nativeBalance.value === 0n;
+  }, [side, address, nativeBalance]);
+
   function submit() {
-    if (!quote || !amount || insufficientBalance) return;
+    if (!quote || !amount || insufficientBalance || nativeGasWarning) return;
     // Don't self-refer — pass the referrer only when it differs from the trader.
     const ref =
       referrer && address && referrer.toLowerCase() !== address.toLowerCase() ? referrer : undefined;
@@ -184,7 +194,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
   }
 
   return (
-    <div className="card-elevated p-4 space-y-4 sticky top-20">
+    <div className="card-elevated p-4 space-y-4 w-full min-w-0 lg:sticky lg:top-20">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="font-semibold font-display">Trade</h3>
@@ -209,6 +219,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
           <button
             key={s}
             onClick={() => setSide(s)}
+            aria-pressed={side === s}
             className={cn(
               "flex-1 rounded-lg py-2.5 text-sm font-semibold capitalize transition-all duration-200 ease-smooth",
               side === s
@@ -255,15 +266,38 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
       <div>
         <label className="mb-1.5 block text-xs text-neutral-500 flex items-center justify-between">
           <span>{side === "buy" ? "You pay" : "You sell"}</span>
-          {address && maxBalance !== undefined && maxBalance > 0n && (
-            <button
-              type="button"
-              className="text-moon-400 hover:text-moon-300 text-[10px] font-medium"
-              onClick={setMax}
-            >
-              MAX
-            </button>
-          )}
+          <span className="flex items-center gap-2 min-w-0 max-w-full">
+            {address && side === "buy" && maxBalance !== undefined && maxBalance > 0n && (
+              <span className="truncate text-[11px]">Bal: {formatEther(maxBalance)} ETH</span>
+            )}
+            {address && side === "sell" && (
+              <span className="truncate text-[11px]">
+                {tokenBalLoading ? (
+                  <span className="text-neutral-600">Loading...</span>
+                  ) : tokenBalError ? (
+                    <span className="text-red-400">Error</span>
+                  ) : maxBalance !== undefined ? (
+                    <span>
+                      Bal: {formatCompactToken(maxBalance)} {tokenSymbol}
+                      {nativeBalance !== undefined && (
+                        <span className="ml-1 text-neutral-600">
+                          / {formatEther(nativeBalance.value)} ETH
+                        </span>
+                      )}
+                    </span>
+                  ) : null}
+              </span>
+            )}
+            {address && maxBalance !== undefined && maxBalance > 0n && (
+              <button
+                type="button"
+                className="text-moon-400 hover:text-moon-300 text-[10px] font-medium"
+                onClick={setMax}
+              >
+                MAX
+              </button>
+            )}
+          </span>
         </label>
         <div className="relative">
           <input
@@ -272,7 +306,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
             value={amount}
             onChange={(e) => handleAmountChange(e.target.value)}
             placeholder="0.0"
-            className="input pr-24 !text-lg font-semibold tabular"
+            className="input w-full pr-20 !text-lg font-semibold tabular"
           />
           <span className={cn(
             "absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium",
@@ -343,6 +377,14 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
         </div>
       )}
 
+      {/* Insufficient gas warning */}
+      {nativeGasWarning && (
+        <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-300 animate-fade-in">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>Insufficient {chainMeta[chainId]?.nativeSymbol ?? "ETH"} for gas. You need a small amount to pay the network fee.</span>
+        </div>
+      )}
+
       {/* Transaction lifecycle: preparing / signature / confirming / success / error */}
       <TxProgress
         stage={trade.lifecycle.stage}
@@ -359,7 +401,7 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
       {/* Submit */}
       <button
         onClick={submit}
-        disabled={!quote || !amount || trade.pending || !address || insufficientBalance}
+        disabled={!quote || !amount || trade.pending || !address || insufficientBalance || nativeGasWarning}
         className={cn(
           "btn w-full !py-3 text-base",
           side === "buy" ? "btn-success" : "btn-danger",
@@ -399,18 +441,16 @@ function Row({
   badge?: string;
 }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-neutral-500 flex items-center gap-1.5">
-        {label}
+    <div className="flex items-center justify-between gap-2 overflow-hidden">
+      <span className="text-neutral-500 flex items-center gap-1.5 min-w-0">
+        <span className="truncate">{label}</span>
         {badge && (
-          <span className="rounded bg-amber-500/15 text-amber-300 px-1.5 py-0.5 text-[9px] font-medium">
-            {badge}
-          </span>
+          <Badge tone="amber">{badge}</Badge>
         )}
       </span>
       <span
         className={cn(
-          "tabular",
+          "tabular truncate shrink-0",
           muted ? "text-neutral-500" : highlight ? "font-semibold text-neutral-100" : "font-medium text-neutral-200",
         )}
       >

@@ -1,25 +1,25 @@
 # Dev-only Postgres for running the backend locally (`pnpm dev`).
 # For the full production stack (db + backend + frontend) use the root
 # ../docker-compose.yml instead. DB name/user/password match that stack so a
-# single DATABASE_URL (postgresql://moon:moon@localhost:5432/moonfun) works for both.
+# single DATABASE_URL (postgresql://moon:moon@localhost:5432/moon) works for both.
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: moonfun-postgres
+    container_name: moon-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: moon
       POSTGRES_PASSWORD: moon
-      POSTGRES_DB: moonfun
+      POSTGRES_DB: moon
     ports:
       - "5432:5432"
     volumes:
-      - moonfun-pgdata:/var/lib/postgresql/data
+      - moon-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U moon -d moonfun"]
+      test: ["CMD-SHELL", "pg_isready -U moon -d moon"]
       interval: 10s
       timeout: 5s
       retries: 5
 
 volumes:
-  moonfun-pgdata:
+  moon-pgdata:

@@ -17,13 +17,16 @@ import {
   Activity,
   AlertCircle,
 } from "lucide-react";
-import { formatUsd, shortenAddress, formatToken, timeAgo, formatMarketCap } from "@/lib/format";
+import { formatUsd, shortenAddress, formatToken, timeAgo, formatMarketCap, formatPriceUsd, formatPercent } from "@/lib/format";
 import { chainMeta } from "@/config/chains";
 import { cn } from "@/lib/cn";
+import { Avatar } from "@/components/ui/Avatar";
 import { ErrorState } from "@/components/feedback/ErrorState";
 import { Skeleton } from "@/components/feedback/Skeleton";
+import { useT } from "@/stores/i18n";
 
 export function Portfolio() {
+  const t = useT();
   const params = useParams<{ address: string }>();
   const { address: walletAddress } = useAccount();
   const address = params.address ? params.address.toLowerCase() : walletAddress;
@@ -109,7 +112,9 @@ export function Portfolio() {
   }
 
   const totalValue = data.totalValueUsd;
-  const totalVolume = data.totalVolume;
+  const unrealizedPnl = data.totalUnrealizedPnlUsd ?? 0;
+  const unrealizedPnlPct = data.totalUnrealizedPnlPct ?? 0;
+  const realizedPnl = data.totalRealizedPnlUsd ?? 0;
   const recentTrades = data.recentTrades.slice(0, 10);
 
   return (
@@ -120,7 +125,7 @@ export function Portfolio() {
           <Wallet className="h-5 w-5 text-moon-400" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold font-display">Portfolio</h1>
+          <h1 className="text-2xl font-bold font-display">{t("portfolio.title")}</h1>
           <p className="text-xs text-neutral-500 font-mono">{shortenAddress(address)}</p>
         </div>
       </div>
@@ -129,27 +134,27 @@ export function Portfolio() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={Wallet}
-          label="Portfolio Value"
+          label={t("portfolio.value")}
           value={formatUsd(totalValue)}
           accent="purple"
           gradient
         />
         <StatCard
           icon={TrendingUp}
-          label="Total Volume"
-          value={totalVolume.toFixed(4)}
-          sub="native tokens traded"
-          accent="cyan"
+          label={t("portfolio.unrealizedPnl")}
+          value={`${unrealizedPnl >= 0 ? "+" : "-"}${formatUsd(Math.abs(unrealizedPnl))}`}
+          sub={`${formatPercent(unrealizedPnlPct)} · realized ${realizedPnl >= 0 ? "+" : "-"}${formatUsd(Math.abs(realizedPnl))}`}
+          accent={unrealizedPnl >= 0 ? "green" : "amber"}
         />
         <StatCard
           icon={Activity}
-          label="Total Trades"
+          label={t("portfolio.totalTrades")}
           value={data.tradeCount.toLocaleString()}
           accent="amber"
         />
         <StatCard
           icon={Coins}
-          label="Tokens Created"
+          label={t("portfolio.tokensCreated")}
           value={data.createdCount.toLocaleString()}
           sub={`${data.graduatedCount} graduated`}
           accent="green"
@@ -161,63 +166,62 @@ export function Portfolio() {
         {/* Positions */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold font-display">Top Positions</h2>
+            <h2 className="text-lg font-semibold font-display">{t("portfolio.topPositions")}</h2>
             <span className="text-xs text-neutral-500">{data.positions.length} total</span>
           </div>
-          {data.positions.length === 0 ? (
-            <div className="card p-8 text-center text-sm text-neutral-500">
+{data.positions.length === 0 ? (
+            <div className="card p-8 text-center text-sm text-[var(--text-muted)]">
               No active positions. <Link to="/" className="text-moon-400 hover:underline">Start trading →</Link>
             </div>
           ) : (
-            <div className="card-elevated overflow-hidden">
-              <div className="divide-y divide-white/[0.04]">
-                {(showAllPositions ? data.positions : data.positions.slice(0, 10)).map((p) => {
-                  const meta = chainMeta[p.chainId];
-                  return (
-                    <Link
-                      key={`${p.chainId}-${p.tokenAddress}`}
-                      to={`/token/${p.chainId}/${p.tokenAddress}`}
-                      className="flex items-center gap-3 p-4 hover:bg-white/[0.02] transition-colors group"
-                    >
-                      <div className="relative shrink-0">
-                        <div className="h-10 w-10 overflow-hidden rounded-full border border-white/[0.08] bg-ink-900">
-                          {p.imageUrl ? (
-                            <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-xs font-bold text-gradient">
-                              {p.symbol.slice(0, 2)}
-                            </div>
-                          )}
-                        </div>
+                    <div className="card-elevated overflow-hidden">
+                      <div className="divide-y divide-[var(--border-subtle)]">
+                        {(showAllPositions ? data.positions : data.positions.slice(0, 10)).map((p) => {
+                          const meta = chainMeta[p.chainId];
+                          return (
+                            <Link
+                              key={`${p.chainId}-${p.tokenAddress}`}
+                              to={`/token/${p.chainId}/${p.tokenAddress}`}
+                              className="grid grid-cols-[auto_1fr_auto] items-center gap-3 p-4 hover:bg-[var(--surface-2)] transition-colors group overflow-hidden"
+                            >
+                              <Avatar src={p.imageUrl} alt={p.name} size={40} shape="circle" className="border-[var(--border-subtle)]" />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-sm truncate min-w-0">{p.name}</span>
+                                  <span className="chip-neutral text-[10px] shrink-0">{meta?.shortLabel}</span>
+                                  {p.graduated && <span className="chip-moon text-[10px] shrink-0"><Flame className="h-2.5 w-2.5" /> Grad</span>}
+                                </div>
+                                <p className="text-xs text-[var(--text-muted)] tabular truncate">
+                                  {formatToken(BigInt(p.balance))} {p.symbol} · {formatPriceUsd(p.priceUsd)}
+                                </p>
+                              </div>
+                              <div className="text-right overflow-hidden">
+                                <p className="font-semibold tabular text-sm truncate">{formatUsd(p.valueUsd)}</p>
+                                {p.costBasisUsd > 0 ? (
+                                  <p className={cn(
+                                    "text-[10px] tabular truncate",
+                                    p.unrealizedPnlUsd >= 0 ? "text-emerald-400" : "text-rose-400",
+                                  )}>
+                                    {p.unrealizedPnlUsd >= 0 ? "+" : "-"}{formatUsd(Math.abs(p.unrealizedPnlUsd))} ({formatPercent(p.unrealizedPnlPct)})
+                                  </p>
+                                ) : (
+                                  <p className="text-[10px] text-[var(--text-muted)] tabular truncate">{p.percentage.toFixed(2)}% supply</p>
+                                )}
+                              </div>
+                            </Link>
+                          );
+                        })}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-sm truncate">{p.name}</span>
-                          <span className="chip-neutral text-[10px]">{meta?.shortLabel}</span>
-                          {p.graduated && <span className="chip-moon text-[10px]"><Flame className="h-2.5 w-2.5" /> Grad</span>}
-                        </div>
-                        <p className="text-xs text-neutral-500 tabular">
-                          {formatToken(BigInt(p.balance))} {p.symbol} · ${p.priceUsd.toFixed(6)}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold tabular text-sm">{formatUsd(p.valueUsd)}</p>
-                        <p className="text-[10px] text-neutral-500 tabular">{p.percentage.toFixed(2)}% supply</p>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-              {data.positions.length > 10 && (
-                <button
-                  onClick={() => setShowAllPositions((v) => !v)}
-                  className="w-full border-t border-white/[0.04] py-2.5 text-xs font-medium text-moon-300 hover:bg-white/[0.02] transition-colors"
-                >
-                  {showAllPositions ? "Show less" : `Show all ${data.positions.length} positions`}
-                </button>
-              )}
-            </div>
-          )}
+                      {data.positions.length > 10 && (
+                        <button
+                          onClick={() => setShowAllPositions((v) => !v)}
+                          className="w-full border-t border-[var(--border-subtle)] py-2.5 text-xs font-medium text-moon-300 hover:bg-[var(--surface-2)] transition-colors"
+                        >
+                          {showAllPositions ? "Show less" : `Show all ${data.positions.length} positions`}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
           {/* Recent trades */}
           <div className="flex items-center justify-between mt-6">
@@ -227,36 +231,36 @@ export function Portfolio() {
           {recentTrades.length === 0 ? (
             <div className="card p-8 text-center text-sm text-neutral-500">No trades yet.</div>
           ) : (
-            <div className="card-elevated overflow-hidden">
-              <div className="divide-y divide-white/[0.04]">
+<div className="card-elevated overflow-hidden">
+              <div className="divide-y divide-[var(--border-subtle)]">
                 {recentTrades.map((t, i) => {
                   const nativeSym = chainMeta[t.chainId]?.nativeSymbol ?? "ETH";
                   return (
-                  <div key={`${t.txHash}-${i}`} className="flex items-center gap-3 p-3 hover:bg-white/[0.02] transition-colors">
-                    <div className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-lg",
-                      t.side === "buy" ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400",
-                    )}>
-                      {t.side === "buy" ? <ArrowDownToLine className="h-4 w-4" /> : <ArrowUpFromLine className="h-4 w-4" />}
+                    <div key={`${t.txHash}-${i}`} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 p-3 hover:bg-[var(--surface-2)] transition-colors overflow-hidden">
+                      <div className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-lg",
+                        t.side === "buy" ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400",
+                      )}>
+                        {t.side === "buy" ? <ArrowDownToLine className="h-4 w-4" /> : <ArrowUpFromLine className="h-4 w-4" />}
+                      </div>
+                      <div className="min-w-0">
+                        <Link
+                          to={`/token/${t.chainId}/${t.tokenAddress}`}
+                          className="text-sm font-medium hover:text-moon-300 transition-colors truncate block"
+                        >
+                          {t.tokenName} <span className="text-[var(--text-muted)]">${t.tokenSymbol}</span>
+                        </Link>
+                        <p className="text-[10px] text-[var(--text-muted)] truncate">{timeAgo(t.timestamp)}</p>
+                      </div>
+                      <div className="text-right overflow-hidden">
+                        <p className="text-xs font-medium tabular truncate">
+                          {Number(t.quoteAmount) / 1e18 < 0.001
+                            ? `${(Number(t.quoteAmount) / 1e18).toExponential(2)} ${nativeSym}`
+                            : `${(Number(t.quoteAmount) / 1e18).toFixed(4)} ${nativeSym}`}
+                        </p>
+                        <p className="text-[10px] text-[var(--text-muted)] tabular truncate">@ {formatPriceUsd(t.priceUsd)}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        to={`/token/${t.chainId}/${t.tokenAddress}`}
-                        className="text-sm font-medium hover:text-moon-300 transition-colors truncate block"
-                      >
-                        {t.tokenName} <span className="text-neutral-500">${t.tokenSymbol}</span>
-                      </Link>
-                      <p className="text-[10px] text-neutral-500">{timeAgo(t.timestamp)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-medium tabular">
-                        {Number(t.quoteAmount) / 1e18 < 0.001
-                          ? `${(Number(t.quoteAmount) / 1e18).toExponential(2)} ${nativeSym}`
-                          : `${(Number(t.quoteAmount) / 1e18).toFixed(4)} ${nativeSym}`}
-                      </p>
-                      <p className="text-[10px] text-neutral-500 tabular">@ ${t.priceUsd.toFixed(6)}</p>
-                    </div>
-                  </div>
                   );
                 })}
               </div>
@@ -273,7 +277,7 @@ export function Portfolio() {
             </Link>
           </div>
           {data.createdTokens.length === 0 ? (
-            <div className="card p-6 text-center text-xs text-neutral-500">
+            <div className="card p-6 text-center text-xs text-[var(--text-muted)]">
               <Rocket className="mx-auto mb-2 h-8 w-8 opacity-30" />
               Haven't launched a token yet.
             </div>
@@ -285,26 +289,18 @@ export function Portfolio() {
                   to={`/token/${t.chainId}/${t.address}`}
                   className="card-hover group block p-3"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 overflow-hidden rounded-full border border-white/[0.08] bg-ink-900 shrink-0">
-                      {t.imageUrl ? (
-                        <img src={t.imageUrl} alt={t.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-gradient">
-                          {t.symbol.slice(0, 2)}
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
+                  <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 overflow-hidden">
+                    <Avatar src={t.imageUrl} alt={t.name} size={36} shape="circle" className="border-[var(--border-subtle)]" />
+                    <div className="min-w-0">
                       <div className="flex items-center gap-1">
-                        <span className="text-sm font-medium truncate">{t.name}</span>
+                        <span className="text-sm font-medium truncate min-w-0">{t.name}</span>
                         {t.graduated && <Flame className="h-3 w-3 text-moon-400 shrink-0" />}
                       </div>
-                      <p className="text-[10px] text-neutral-500 tabular">
+                      <p className="text-[10px] text-[var(--text-muted)] tabular truncate">
                         Mkt {formatMarketCap(t.marketCapUsd)} · {t.holderCount} holders
                       </p>
                     </div>
-                    <ExternalLink className="h-3 w-3 text-neutral-600 group-hover:text-moon-300 transition-colors" />
+                    <ExternalLink className="h-3 w-3 text-[var(--text-muted)] group-hover:text-moon-300 transition-colors" />
                   </div>
                 </Link>
               ))}
@@ -345,7 +341,7 @@ function StatCard({
           <Icon className="h-5 w-5" />
         </div>
         <p className="text-xs uppercase tracking-wider text-neutral-500">{label}</p>
-        <p className={cn("mt-1 text-2xl font-bold tabular", gradient && "text-gradient")}>{value}</p>
+        <p className={cn("mt-1 text-2xl font-bold tabular truncate", gradient && "text-gradient")}>{value}</p>
         {sub && <p className="mt-0.5 text-[10px] text-neutral-500">{sub}</p>}
       </div>
     </div>

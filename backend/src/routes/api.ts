@@ -5,11 +5,18 @@ import { tokenService } from "../services/tokenService.js";
 import { tradeService } from "../services/tradeService.js";
 import { holderService } from "../services/holderService.js";
 import { prisma } from "../utils/db.js";
+import { logger } from "../utils/logger.js";
 import { SUPPORTED_CHAIN_IDS } from "../config/chains.js";
 
 export const apiRouter = Router();
 
-const limiter = rateLimit({ windowMs: 60_000, max: 120, skip: (req) => req.path === "/health" });
+const limiter = rateLimit({ 
+  windowMs: 60_000, 
+  max: 120, 
+  skip: (req) => req.path === "/health",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 apiRouter.use(limiter);
 
 /** Validate and parse chainId from route/query param. Returns 400 if invalid or unsupported. */
@@ -44,18 +51,19 @@ apiRouter.get("/tokens", async (req, res, next) => {
 });
 
 apiRouter.get("/tokens/:chainId/:address", async (req, res, next) => {
-  try {
-    const chainId = parseChainId(req.params.chainId, res);
-    if (chainId === null) return;
-    const address = parseAddress(req.params.address, res);
-    if (!address) return;
-    const token = await tokenService.get(chainId, address);
-    if (!token) return res.status(404).json({ error: "Token not found" });
-    res.json(token);
-  } catch (e) {
-    next(e);
-  }
-});
+    try {
+      const chainId = parseChainId(req.params.chainId, res);
+      if (chainId === null) return;
+      const address = parseAddress(req.params.address, res);
+      if (!address) return;
+      const token = await tokenService.get(chainId, address);
+      if (!token) return res.status(404).json({ error: "Token not found" });
+      res.json(token);
+    } catch (e) {
+      logger.error({ err: e, chainId: req.params.chainId, address: req.params.address }, "Token fetch failed");
+      next(e);
+    }
+  });
 
 apiRouter.get("/tokens/:chainId/:address/trades", async (req, res, next) => {
   try {
@@ -72,15 +80,39 @@ apiRouter.get("/tokens/:chainId/:address/trades", async (req, res, next) => {
   }
 });
 
+const WINDOW_HOURS: Record<string, number> = {
+  "1m": 1 / 60,
+  "5m": 5 / 60,
+  "15m": 15 / 60,
+  "1h": 1,
+  "4h": 4,
+  "1d": 24,
+  "7d": 168,
+};
+
 apiRouter.get("/tokens/:chainId/:address/prices", async (req, res, next) => {
   try {
     const chainId = parseChainId(req.params.chainId, res);
     if (chainId === null) return;
     const address = parseAddress(req.params.address, res);
     if (!address) return;
-    const window = req.query.window === "7d" ? 168 : req.query.window === "1h" ? 1 : 24;
+    const window = WINDOW_HOURS[String(req.query.window)] ?? 24;
     const history = await tradeService.priceHistory(chainId, address, window);
     res.json(history);
+  } catch (e) {
+    next(e);
+  }
+});
+
+apiRouter.get("/tokens/:chainId/:address/ohlc", async (req, res, next) => {
+  try {
+    const chainId = parseChainId(req.params.chainId, res);
+    if (chainId === null) return;
+    const address = parseAddress(req.params.address, res);
+    if (!address) return;
+    const window = WINDOW_HOURS[String(req.query.window)] ?? 24;
+    const candles = await tradeService.ohlcHistory(chainId, address, window);
+    res.json(candles);
   } catch (e) {
     next(e);
   }
@@ -131,7 +163,11 @@ apiRouter.get("/creator-fees/:creator", async (req, res, next) => {
   try {
     const creator = parseAddress(req.params.creator, res);
     if (!creator) return;
-    const rows = await prisma.creatorFeeBalance.findMany({ where: { creator }, take: 100 });
+    const rows = await prisma.creatorFeeBalance.findMany({
+      where: { creator },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+    });
     res.json(rows);
   } catch (e) {
     next(e);
@@ -174,7 +210,7 @@ apiRouter.get("/portfolio/:address", async (req, res, next) => {
     if (!address) return;
 
     // Run independent queries in parallel — was N+1 sequential.
-    const [holdings, trades, created, tradeCount, createdCount, graduatedCount] = await Promise.all([
+    const [holdings, trades, allTrades, created, tradeCount, createdCount, graduatedCount] = await Promise.all([
       prisma.holder.findMany({
         where: { address },
         include: { token: true },
@@ -188,6 +224,13 @@ apiRouter.get("/portfolio/:address", async (req, res, next) => {
         take: 50,
         include: { token: true },
       }),
+      // Full trade history (chronological) used to compute cost basis / PnL.
+      prisma.trade.findMany({
+        where: { trader: address },
+        orderBy: { timestamp: "asc" },
+        select: { chainId: true, tokenAddress: true, side: true, tokenAmount: true, priceUsd: true },
+        take: 5000,
+      }),
       prisma.token.findMany({
         where: { creator: address },
         orderBy: { createdAt: "desc" },
@@ -200,12 +243,48 @@ apiRouter.get("/portfolio/:address", async (req, res, next) => {
 
     const totalVolume = trades.reduce((sum: number, t: { quoteAmount: string }) => sum + Number(t.quoteAmount) / 1e18, 0);
 
+    // Weighted-average cost basis per token, replaying trades chronologically.
+    // Tracks remaining token qty, its cost basis (USD), and realized PnL.
+    interface Cost { qty: number; costUsd: number; realizedPnlUsd: number }
+    const costByToken = new Map<string, Cost>();
+    for (const t of allTrades) {
+      const key = `${t.chainId}-${t.tokenAddress.toLowerCase()}`;
+      let c = costByToken.get(key);
+      if (!c) {
+        c = { qty: 0, costUsd: 0, realizedPnlUsd: 0 };
+        costByToken.set(key, c);
+      }
+      const amount = Number(t.tokenAmount) / 1e18;
+      const price = t.priceUsd ?? 0;
+      if (t.side === "buy") {
+        c.qty += amount;
+        c.costUsd += amount * price;
+      } else if (t.side === "sell") {
+        const avg = c.qty > 0 ? c.costUsd / c.qty : 0;
+        const sold = Math.min(amount, c.qty);
+        c.realizedPnlUsd += sold * (price - avg);
+        c.qty -= sold;
+        c.costUsd -= sold * avg;
+        if (c.qty < 1e-9) {
+          c.qty = 0;
+          c.costUsd = 0;
+        }
+      }
+    }
+
     // 5. Portfolio value (sum of holdings * priceUsd).
     const positions = holdings
       .filter((h: { token?: { priceUsd: number; name: string; symbol: string; imageUrl: string; graduated: boolean; curveShape: number } | null; balance: string; chainId: number; tokenAddress: string; percentage: number }) => !!h.token && Number(h.balance) > 0)
       .map((h: { token: NonNullable<typeof holdings[number]['token']>; balance: string; chainId: number; tokenAddress: string; percentage: number }) => {
         const balance = Number(h.balance) / 1e18;
         const price = h.token.priceUsd ?? 0;
+        const valueUsd = balance * price;
+        const cost = costByToken.get(`${h.chainId}-${h.tokenAddress.toLowerCase()}`);
+        const costBasisUsd = cost ? cost.costUsd : 0;
+        const avgEntryUsd = cost && cost.qty > 0 ? cost.costUsd / cost.qty : 0;
+        const realizedPnlUsd = cost ? cost.realizedPnlUsd : 0;
+        const unrealizedPnlUsd = costBasisUsd > 0 ? valueUsd - costBasisUsd : 0;
+        const unrealizedPnlPct = costBasisUsd > 0 ? (unrealizedPnlUsd / costBasisUsd) * 100 : 0;
         return {
           chainId: h.chainId,
           tokenAddress: h.tokenAddress,
@@ -215,20 +294,33 @@ apiRouter.get("/portfolio/:address", async (req, res, next) => {
           balance: h.balance,
           balanceDisplay: balance,
           priceUsd: price,
-          valueUsd: balance * price,
+          valueUsd,
           percentage: h.percentage,
           graduated: h.token.graduated,
           curveShape: h.token.curveShape,
+          costBasisUsd,
+          avgEntryUsd,
+          realizedPnlUsd,
+          unrealizedPnlUsd,
+          unrealizedPnlPct,
         };
       })
       .sort((a: { valueUsd: number }, b: { valueUsd: number }) => b.valueUsd - a.valueUsd);
 
     const totalValueUsd = positions.reduce((sum: number, p: { valueUsd: number }) => sum + p.valueUsd, 0);
+    const totalCostBasisUsd = positions.reduce((sum: number, p: { costBasisUsd: number }) => sum + p.costBasisUsd, 0);
+    const totalUnrealizedPnlUsd = positions.reduce((sum: number, p: { unrealizedPnlUsd: number }) => sum + p.unrealizedPnlUsd, 0);
+    const totalRealizedPnlUsd = [...costByToken.values()].reduce((sum, c) => sum + c.realizedPnlUsd, 0);
+    const totalUnrealizedPnlPct = totalCostBasisUsd > 0 ? (totalUnrealizedPnlUsd / totalCostBasisUsd) * 100 : 0;
 
     res.json({
       address,
       totalValueUsd,
       totalVolume,
+      totalCostBasisUsd,
+      totalUnrealizedPnlUsd,
+      totalUnrealizedPnlPct,
+      totalRealizedPnlUsd,
       tradeCount,
       createdCount,
       graduatedCount,

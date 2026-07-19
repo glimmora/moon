@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { isAddress, getAddress, type Address } from "viem";
 
-const STORAGE_KEY = "moon.referrer";
+export const REFERRER_STORAGE_KEY = "Moon.referrer";
+const STORAGE_KEY = REFERRER_STORAGE_KEY;
 const ZERO = "0x0000000000000000000000000000000000000000";
 
 /**

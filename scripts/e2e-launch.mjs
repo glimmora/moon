@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// moon.fun — Frontend E2E Launch + Buy test
+// Moon — Frontend E2E Launch + Buy test
 // Mirrors the exact on-chain path the frontend uses:
 //   1. createToken (same struct as useCreateToken.ts)
 //   2. buy on the new bonding curve
@@ -126,7 +126,7 @@ async function createToken() {
   const createArgs = {
     name: 'E2E Launch Test',
     symbol: 'E2E',
-    imageUrl: 'https://moon.fun/e2e.png',
+    imageUrl: 'https://Moon/e2e.png',
     description: 'End-to-end test token',
     maxTxBps: 100n,          // 1% max tx
     maxHoldBps: 500n,        // 5% max hold
@@ -307,7 +307,7 @@ async function verifyBackend(tokenAddr) {
 // ─── Main ─────────────────────────────────────────────────────────
 async function main() {
   console.log('═══════════════════════════════════════════════════════════════');
-  console.log('  moon.fun — Frontend E2E Launch + Buy Test');
+  console.log('  Moon — Frontend E2E Launch + Buy Test');
   console.log('═══════════════════════════════════════════════════════════════');
 
   await checkBalance();

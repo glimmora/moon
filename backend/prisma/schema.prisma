@@ -1,4 +1,4 @@
-// moon.fun backend Prisma schema.
+// Moon backend Prisma schema.
 // Database: PostgreSQL 16 (the only supported provider).
 // For local dev, start the bundled Postgres with `docker compose up -d db`.
 
@@ -25,6 +25,7 @@ model Token {
   curveShape  Int
   totalSupply String
   creator     String
+  creationBlock BigInt?
   graduated   Boolean  @default(false)
   dexPair     String?
   priceUsd    Float    @default(0)

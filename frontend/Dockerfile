@@ -7,7 +7,7 @@ WORKDIR /app
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY frontend/package.json ./frontend/
-RUN pnpm install --frozen-lockfile --filter @moon.fun/frontend...
+RUN pnpm install --frozen-lockfile --filter @Moon/frontend...
 
 COPY frontend ./frontend
 
@@ -61,7 +61,7 @@ ENV CHAIN_V3_CONCENTRATOR_ETHEREUM_SEPOLIA=${CHAIN_V3_CONCENTRATOR_ETHEREUM_SEPO
 ENV CHAIN_MOON_TOKEN_ETHEREUM_SEPOLIA=${CHAIN_MOON_TOKEN_ETHEREUM_SEPOLIA}
 ENV FRONTEND_WALLETCONNECT_PROJECT_ID=${FRONTEND_WALLETCONNECT_PROJECT_ID}
 ENV NODE_ENV=production
-RUN pnpm --filter @moon.fun/frontend run build
+RUN pnpm --filter @Moon/frontend run build
 
 # ─────────────────────────  Runtime stage  ───────────────────────
 FROM nginx:1.27-alpine AS runtime

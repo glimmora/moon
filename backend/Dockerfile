@@ -12,13 +12,13 @@ WORKDIR /app
 # Install deps against the workspace lockfile for reproducible builds.
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY backend/package.json ./backend/
-RUN pnpm install --frozen-lockfile --filter @moon.fun/backend...
+RUN pnpm install --frozen-lockfile --filter @Moon/backend...
 
 COPY backend ./backend
-RUN pnpm --filter @moon.fun/backend run db:generate \
-    && pnpm --filter @moon.fun/backend run build \
+RUN pnpm --filter @Moon/backend run db:generate \
+    && pnpm --filter @Moon/backend run build \
     # Prune dev dependencies for a lean runtime.
-    && pnpm --filter @moon.fun/backend prune --prod
+    && pnpm --filter @Moon/backend prune --prod
 
 # ─────────────────────────  Runtime stage  ───────────────────────
 FROM node:20-slim AS runtime

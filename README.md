@@ -1,4 +1,4 @@
-# moon.fun
+# Moon
 
 > A permissionless meme-token launchpad with bonding curves, on-chain referrals, creator fee vaults, and a self-sustaining buyback-and-burn flywheel.
 
@@ -11,7 +11,7 @@
 
 ## Overview
 
-`moon.fun` lets anyone launch an ERC-20 meme token in seconds with no upfront liquidity. Tokens are bought and sold against an on-chain **bonding curve** (linear, exponential, or logarithmic). When a token's market cap reaches the graduation threshold, the curve mints the reserved supply, seeds a Uniswap V2 pool, and burns the LP tokens — graduating the token to permissionless DEX trading.
+`Moon` lets anyone launch an ERC-20 meme token in seconds with no upfront liquidity. Tokens are bought and sold against an on-chain **bonding curve** (linear, exponential, or logarithmic). When a token's market cap reaches the graduation threshold, the curve mints the reserved supply, seeds a Uniswap V2 pool, and burns the LP tokens — graduating the token to permissionless DEX trading.
 
 A portion of every trade fee flows back to the protocol:
 
@@ -53,7 +53,7 @@ See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full system design.
 ## Monorepo Layout
 
 ```
-moon.fun/
+Moon/
 ├── contracts/      # Foundry project — Solidity 0.8.24 + OpenZeppelin v5
 ├── frontend/       # Vite 5 + React 18 + wagmi 2 + RainbowKit 2 + Tailwind 3
 ├── backend/        # Node 20 + Express + Socket.io + Prisma + Postgres
@@ -75,8 +75,8 @@ moon.fun/
 ### One-command dev launcher
 
 ```bash
-git clone https://github.com/glimmora/moon.git moon.fun
-cd moon.fun
+git clone https://github.com/glimmora/moon.git Moon
+cd Moon
 ./scripts/dev.sh
 ```
 
@@ -217,4 +217,4 @@ Run on-chain tests:
 
 ## License
 
-MIT © moon.fun contributors
+MIT © Moon contributors

@@ -1,5 +1,5 @@
 {
-  "name": "moon.fun",
+  "name": "Moon",
   "version": "1.0.0",
   "private": true,
   "description": "Permissionless meme-token launchpad with multi-shape bonding curves.",
@@ -9,16 +9,16 @@
     "node": ">=20"
   },
   "scripts": {
-    "install:contracts": "pnpm --filter @moon.fun/contracts install",
-    "build:contracts": "pnpm --filter @moon.fun/contracts run build",
-    "test:contracts": "pnpm --filter @moon.fun/contracts run test",
-    "lint:contracts": "pnpm --filter @moon.fun/contracts run lint",
-    "dev:frontend": "pnpm --filter @moon.fun/frontend dev",
-    "build:frontend": "pnpm --filter @moon.fun/frontend build",
-    "lint:frontend": "pnpm --filter @moon.fun/frontend lint",
-    "dev:backend": "pnpm --filter @moon.fun/backend dev",
-    "build:backend": "pnpm --filter @moon.fun/backend build",
-    "lint:backend": "pnpm --filter @moon.fun/backend lint",
+    "install:contracts": "pnpm --filter @Moon/contracts install",
+    "build:contracts": "pnpm --filter @Moon/contracts run build",
+    "test:contracts": "pnpm --filter @Moon/contracts run test",
+    "lint:contracts": "pnpm --filter @Moon/contracts run lint",
+    "dev:frontend": "pnpm --filter @Moon/frontend dev",
+    "build:frontend": "pnpm --filter @Moon/frontend build",
+    "lint:frontend": "pnpm --filter @Moon/frontend lint",
+    "dev:backend": "pnpm --filter @Moon/backend dev",
+    "build:backend": "pnpm --filter @Moon/backend build",
+    "lint:backend": "pnpm --filter @Moon/backend lint",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
     "setup": "bash scripts/setup-dev.sh"

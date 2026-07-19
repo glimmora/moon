@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright E2E config for moon.fun.
+ * Playwright E2E config for Moon.
  *
  * The dev server is started with the test-only wallet gate enabled:
  *   E2E_ENABLED=true                 → activates the local PK connector + auto-connect

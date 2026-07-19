@@ -37,6 +37,10 @@ contracts/lib/
 *.swp
 *.swo
 
+# ─── Agent / tooling scratch dirs ────────────────────────
+.kilo/
+.opencode/
+
 # ─── Playwright E2E artifacts ───────────────────────────
 playwright-report/
 test-results/

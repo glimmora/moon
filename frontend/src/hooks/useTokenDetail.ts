@@ -3,17 +3,28 @@ import { useQuery } from "@tanstack/react-query";
 import { getContracts } from "@/config/contracts";
 import { bondingCurveAbi } from "@/abi/BondingCurve";
 import { api } from "@/services/api";
+import { fetchTokenMetaOnChain } from "@/services/onchain";
 import { type Address } from "viem";
 
 export function useTokenDetail(chainId: number, tokenAddress: Address) {
   const contracts = getContracts(chainId);
 
-  // 1. Off-chain metadata + history from backend.
+  // 1. Off-chain metadata + history from backend, with on-chain fallback.
   const meta = useQuery({
     queryKey: ["token-meta", chainId, tokenAddress],
-    queryFn: () => api.getToken(chainId, tokenAddress),
+    queryFn: async () => {
+      try {
+        return await api.getToken(chainId, tokenAddress);
+      } catch {
+        const onChain = await fetchTokenMetaOnChain(chainId, tokenAddress);
+        if (onChain) return onChain;
+        throw new Error("Token not found — backend and on-chain fallback both failed.");
+      }
+    },
     enabled: Boolean(tokenAddress),
     refetchInterval: 10_000,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
   // 2. On-chain curve state. The backend index tells us which curve belongs to this token.

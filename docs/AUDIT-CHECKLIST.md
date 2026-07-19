@@ -1,4 +1,4 @@
-# moon.fun — Pre-Audit Checklist
+# Moon — Pre-Audit Checklist
 
 Run through this list before any mainnet deployment and before engaging a formal auditor.
 

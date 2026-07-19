@@ -58,9 +58,17 @@ const schema = z.object({
   // On each poll we re-scan the last N confirmed blocks to heal shallow reorgs
   // (upserts are idempotent). Must be <= BACKEND_CONFIRMATIONS to stay in the safe zone.
   BACKEND_REORG_REWIND_BLOCKS: z.coerce.number().default(12),
+  // Fast-path confirmations for TokenCreated events only. Because tokenService.upsert
+  // is idempotent and keyed by (chainId, address), indexing new tokens at a shallower
+  // depth is reorg-safe — a reorg simply re-upserts the same row. This lets freshly
+  // launched tokens appear in lists/detail after ~N blocks instead of BACKEND_CONFIRMATIONS.
+  BACKEND_CREATE_CONFIRMATIONS: z.coerce.number().default(2),
 }).refine((e) => e.BACKEND_REORG_REWIND_BLOCKS <= e.BACKEND_CONFIRMATIONS, {
   message: "BACKEND_REORG_REWIND_BLOCKS must be <= BACKEND_CONFIRMATIONS (else the rewind scans into the unsafe reorg window)",
   path: ["BACKEND_REORG_REWIND_BLOCKS"],
+}).refine((e) => e.BACKEND_CREATE_CONFIRMATIONS >= 0 && e.BACKEND_CREATE_CONFIRMATIONS <= e.BACKEND_CONFIRMATIONS, {
+  message: "BACKEND_CREATE_CONFIRMATIONS must be between 0 and BACKEND_CONFIRMATIONS",
+  path: ["BACKEND_CREATE_CONFIRMATIONS"],
 });
 
 const parsed = schema.safeParse(process.env);

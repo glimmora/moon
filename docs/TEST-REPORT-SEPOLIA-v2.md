@@ -1,4 +1,4 @@
-# moon.fun — On-Chain Security & Feature Test Report v2
+# Moon — On-Chain Security & Feature Test Report v2
 
 **Date:** 2026-07-15
 **Network:** Ethereum Sepolia (chainId 11155111)
@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-Comprehensive on-chain security and feature tests were executed against the moon.fun deployment on Ethereum Sepolia. **All 19 tests passed** — features work correctly and all unauthorized access attempts were properly rejected.
+Comprehensive on-chain security and feature tests were executed against the Moon deployment on Ethereum Sepolia. **All 19 tests passed** — features work correctly and all unauthorized access attempts were properly rejected.
 
 | Category | Pass | Revert (Expected) | Fail |
 |----------|------|-------------------|------|
@@ -247,7 +247,7 @@ All tests attempted by attacker wallet (0xe764...). Every unauthorized action wa
 
 ## Conclusion
 
-**ALL 28 ON-CHAIN TESTS PASS.** The moon.fun protocol is production-ready for testnet. Every feature works as designed, and every unauthorized access attempt is properly blocked. The 2 critical bugs found in previous sessions (fee fraction vs absolute, MINTER_ROLE grant) are confirmed fixed and working on-chain.
+**ALL 28 ON-CHAIN TESTS PASS.** The Moon protocol is production-ready for testnet. Every feature works as designed, and every unauthorized access attempt is properly blocked. The 2 critical bugs found in previous sessions (fee fraction vs absolute, MINTER_ROLE grant) are confirmed fixed and working on-chain.
 
 **Security score: 9.5/10** (up from 9.2 after on-chain verification)
 

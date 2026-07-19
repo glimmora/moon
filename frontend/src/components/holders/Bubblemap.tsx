@@ -33,12 +33,20 @@ export function Bubblemap({ chainId, tokenAddress }: BubblemapProps) {
         size: 10 + (n.percentage / maxPct) * 40,
       };
     });
+    const byAddress = new Map(nodes.map((n) => [n.address.toLowerCase(), n]));
+    // Dedupe undirected edges so each pair is drawn once.
+    const seen = new Set<string>();
     const links = data.flatMap((n) =>
-      n.connections.map((target) => ({
-        from: nodes.find((x) => x.address === n.address)!,
-        to: nodes.find((x) => x.address === target),
-      })),
-    ).filter((l) => l.from && l.to);
+      n.connections.map((target) => {
+        const from = byAddress.get(n.address.toLowerCase());
+        const to = byAddress.get(target.toLowerCase());
+        if (!from || !to) return null;
+        const key = [from.address.toLowerCase(), to.address.toLowerCase()].sort().join("|");
+        if (seen.has(key)) return null;
+        seen.add(key);
+        return { from, to };
+      }),
+    ).filter((l): l is { from: (typeof nodes)[number]; to: (typeof nodes)[number] } => l !== null);
     return { nodes, links };
   }, [data]);
 

@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Star, Flame, ArrowUpRight } from "lucide-react";
 import { type TokenListItem } from "@/hooks/useTokens";
-import { formatMarketCap, shortenAddress, timeAgo, graduationProgress } from "@/lib/format";
+import { formatMarketCap, shortenAddress, timeAgo, graduationProgress, formatPriceUsd } from "@/lib/format";
 import { chainMeta } from "@/config/chains";
 import { cn } from "@/lib/cn";
 import { useState, memo } from "react";
@@ -11,6 +11,7 @@ import { toggleWatchlist } from "@/hooks/useTokens";
 import { useToast } from "@/stores/toast";
 import { useTheme } from "@/stores/theme";
 import { LaunchCountdown } from "./LaunchCountdown";
+import { Avatar } from "@/components/ui/Avatar";
 
 interface TokenCardProps {
   token: TokenListItem;
@@ -78,23 +79,13 @@ export const TokenCard = memo(function TokenCard({ token, defaultWatched = false
         {/* Avatar with ring */}
         <div className="relative shrink-0">
           <div className="absolute inset-0 rounded-full bg-moon-gradient opacity-30 blur-md group-hover:opacity-50 transition-opacity" />
-          <div className={cn(
-            "relative h-12 w-12 overflow-hidden rounded-full border bg-ink-900",
-            isLight ? "border-neutral-200" : "border-white/[0.08]",
-          )}>
-            {token.imageUrl ? (
-              <img
-                src={token.imageUrl}
-                alt={token.name}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-base font-bold text-gradient">
-                {token.symbol.slice(0, 2)}
-              </div>
-            )}
-          </div>
+          <Avatar
+            src={token.imageUrl}
+            alt={token.name}
+            size={48}
+            shape="circle"
+            className={cn(isLight ? "border-neutral-200" : "border-white/[0.08]")}
+          />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -140,15 +131,15 @@ export const TokenCard = memo(function TokenCard({ token, defaultWatched = false
       <div className="relative z-10 pointer-events-none mt-3 grid grid-cols-3 gap-2 text-xs">
         <div>
           <p className="text-neutral-500 text-[10px] uppercase tracking-wider">Mkt Cap</p>
-          <p className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>{formatMarketCap(token.marketCapUsd)}</p>
+          <p className={cn("font-semibold tabular truncate", isLight ? "text-neutral-900" : "text-neutral-100")}>{formatMarketCap(token.marketCapUsd)}</p>
         </div>
         <div>
           <p className="text-neutral-500 text-[10px] uppercase tracking-wider">Price</p>
-          <p className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>${token.priceUsd.toFixed(6)}</p>
+          <p className={cn("font-semibold tabular truncate", isLight ? "text-neutral-900" : "text-neutral-100")}>{formatPriceUsd(token.priceUsd)}</p>
         </div>
         <div>
           <p className="text-neutral-500 text-[10px] uppercase tracking-wider">24h Vol</p>
-          <p className={cn("font-semibold tabular", isLight ? "text-neutral-900" : "text-neutral-100")}>{formatMarketCap(token.volume24h)}</p>
+          <p className={cn("font-semibold tabular truncate", isLight ? "text-neutral-900" : "text-neutral-100")}>{formatMarketCap(token.volume24h)}</p>
         </div>
       </div>
 

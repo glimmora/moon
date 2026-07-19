@@ -1,4 +1,4 @@
-# moon.fun — Engineering Skill Rules
+# Moon — Engineering Skill Rules
 
 Canonical rules every contributor (human or AI) MUST follow when touching this repo.
 These rules are derived from the security fixes applied after the v2 audit + on-chain

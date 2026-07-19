@@ -6,11 +6,38 @@ import { moonTokenAbi } from "../config/abi.js";
 import { prisma } from "../utils/db.js";
 import { env } from "../config/env.js";
 import { tokenService } from "../services/tokenService.js";
+import { holderService } from "../services/holderService.js";
+import { prismaCircuit } from "../utils/circuitBreaker.js";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
 const holderIntervals = new Map<number, ReturnType<typeof setInterval>>();
 const holderPolling = new Map<number, boolean>();
+
+// Bound concurrent token processing to avoid overwhelming DB connection pool
+const MAX_CONCURRENT_TOKENS = 5;
+
+/**
+ * Process tokens with controlled concurrency using a semaphore pattern.
+ */
+function withConcurrency<T>(items: T[], fn: (item: T) => Promise<void>, limit: number): Promise<void> {
+  const results: Promise<void>[] = [];
+  let i = 0;
+  
+  async function runNext() {
+    if (i >= items.length) return;
+    const idx = i++;
+    await fn(items[idx]);
+    return runNext();
+  }
+  
+  const workers = Math.min(limit, items.length);
+  for (let w = 0; w < workers; w++) {
+    results.push(runNext());
+  }
+  
+  return Promise.all(results).then(() => {});
+}
 
 /**
  * Listen for ERC-20 Transfer events on each tracked MoonToken to refresh holder
@@ -36,20 +63,25 @@ export async function startHolderListener(chain: ChainConfig): Promise<void> {
       // Process ALL tokens via cursor pagination instead of limiting to 50.
       let cursor: string | undefined;
       let hasMore = true;
+      const allTokens: { id: string; address: string; totalSupply: string; creationBlock: bigint | null }[] = [];
+      
       while (hasMore) {
-        const batch = await prisma.token.findMany({
+        const batch = await prismaCircuit.exec(() => prisma.token.findMany({
           where: { chainId: chain.chainId },
-          select: { id: true, address: true, totalSupply: true },
+          select: { id: true, address: true, totalSupply: true, creationBlock: true },
           take: 200,
           orderBy: { id: "asc" },
           ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-        });
-        for (const token of batch) {
-          await refreshHolders(client, chain, token.address as `0x${string}`, token.totalSupply);
-        }
+        }));
+        allTokens.push(...batch);
         hasMore = batch.length === 200;
         if (hasMore) cursor = batch[batch.length - 1].id;
       }
+      
+      // Process tokens with bounded concurrency to avoid DB pool exhaustion
+      await withConcurrency(allTokens, async (token) => {
+        await refreshHolders(client, chain, token.address as `0x${string}`, token.totalSupply, token.creationBlock);
+      }, MAX_CONCURRENT_TOKENS);
     } catch (err) {
       logger.error({ chainId: chain.chainId, err }, "Holder listener error");
     } finally {
@@ -73,6 +105,7 @@ async function refreshHolders(
   chain: ChainConfig,
   tokenAddress: `0x${string}`,
   totalSupplyStr?: string,
+  creationBlock?: bigint | null,
 ): Promise<void> {
   // AUDIT-FIX I-4: Use a per-token checkpoint + bounded block range to avoid hitting
   // RPC log limits. On first run, we start from the token's creation block minus a
@@ -99,9 +132,14 @@ async function refreshHolders(
   let fromBlock: bigint;
   if (checkpoint?.lastBlock) {
     fromBlock = BigInt(checkpoint.lastBlock) + 1n;
+  } else if (creationBlock && creationBlock > 0n) {
+    // Start from the token's on-chain creation block so the mint Transfer
+    // event is always captured, even for tokens older than 100k blocks.
+    fromBlock = BigInt(creationBlock);
   } else {
-    // Initial snapshot: fetch from a deeper offset (100k blocks ≈ 2 days).
-    fromBlock = safeHead > 100_000n ? safeHead - 100_000n : 1n;
+    // Fallback: scan from genesis.  This is a one-time cost only for
+    // tokens that were indexed before we started recording creationBlock.
+    fromBlock = 1n;
   }
   const toBlock = safeHead - fromBlock > MAX_RANGE ? fromBlock + MAX_RANGE : safeHead;
   if (toBlock < fromBlock) return;
@@ -117,7 +155,19 @@ async function refreshHolders(
     return null;
   })) as Log[] | null;
   // Null = RPC failure. Do NOT advance the checkpoint, so we retry this range.
-  if (logs === null) return;
+  if (logs === null) {
+    // Fallback: derive holders from reliably-indexed trade records so the
+    // holder list still populates when getLogs over historical blocks is
+    // unavailable (e.g. local/dev RPCs without archive support).
+    const count = await holderService.refreshFromTrades(chain.chainId, tokenAddress, totalSupplyStr).catch((err) => {
+      logger.warn({ chainId: chain.chainId, tokenAddress, err }, "Trade-based holder fallback failed");
+      return null;
+    });
+    if (count !== null) {
+      await tokenService.updateMarketStats(chain.chainId, tokenAddress, { holderCount: count }).catch(() => {});
+    }
+    return;
+  }
 
   const parsed = parseEventLogs({ abi: moonTokenAbi, logs: logs as never });
   // Deltas within this window only.
@@ -194,6 +244,13 @@ async function refreshHolders(
       );
     }
     await prisma.$transaction(ops);
+  } else if ((await prisma.holder.count({ where: { chainId: chain.chainId, tokenAddress } })) === 0) {
+    // getLogs succeeded but returned no Transfer events for this window, and we
+    // have no holders yet. Backfill from trade records so the holder list still
+    // renders for tokens with curve activity but no resolvable Transfer logs.
+    await holderService.refreshFromTrades(chain.chainId, tokenAddress, totalSupplyStr).catch((err) => {
+      logger.warn({ chainId: chain.chainId, tokenAddress, err }, "Trade-based holder backfill failed");
+    });
   }
 
   // Recompute accurate holder count (all non-zero rows for this token).

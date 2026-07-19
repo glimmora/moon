@@ -1,4 +1,4 @@
-# moon.fun — Sepolia On-Chain Integration Test Report
+# Moon — Sepolia On-Chain Integration Test Report
 
 **Date:** 2026-07-15
 **Network:** Ethereum Sepolia (chainId 11155111)
@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-A comprehensive integration test suite was run against freshly-deployed moon.fun contracts using Foundry's in-memory EVM. The tests exercise the **exact same bytecode** that would be deployed on-chain, providing the same guarantees as a live Sepolia test without the gas cost.
+A comprehensive integration test suite was run against freshly-deployed Moon contracts using Foundry's in-memory EVM. The tests exercise the **exact same bytecode** that would be deployed on-chain, providing the same guarantees as a live Sepolia test without the gas cost.
 
 During testing, **2 CRITICAL bugs** were discovered and fixed:
 

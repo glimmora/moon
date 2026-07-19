@@ -1,7 +1,7 @@
 {
-  "name": "@moon.fun/contracts",
+  "name": "@Moon/contracts",
   "version": "1.0.0",
-  "description": "moon.fun smart contracts — bonding-curve launchpad",
+  "description": "Moon smart contracts — bonding-curve launchpad",
   "license": "MIT",
   "private": true,
   "scripts": {

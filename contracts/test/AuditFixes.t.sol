@@ -302,7 +302,7 @@ contract AuditFixesTest is Test {
         IMoonFactory.CreateParams memory params = IMoonFactory.CreateParams({
             name: "LimitToken",
             symbol: "LIM",
-            imageUrl: "https://moon.fun/t.png",
+            imageUrl: "https://Moon/t.png",
             description: "limit",
             maxTxBps: 100, // 1%
             maxHoldBps: 1000, // 10%
@@ -359,7 +359,7 @@ contract AuditFixesTest is Test {
         IMoonFactory.CreateParams memory params = IMoonFactory.CreateParams({
             name: "AuditToken",
             symbol: "AUD",
-            imageUrl: "https://moon.fun/t.png",
+            imageUrl: "https://Moon/t.png",
             description: "audit",
             maxTxBps: 0,
             maxHoldBps: 0,

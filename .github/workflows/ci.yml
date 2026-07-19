@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AUTH_JWT_SECRET: test-secret-test-secret-test-secret-123456
-      DB_URL: postgresql://postgres:postgres@localhost:5432/moonfun_test
+      DB_URL: postgresql://postgres:postgres@localhost:5432/moon_test
       NODE_ENV: test
     services:
       postgres:
@@ -23,7 +23,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: moonfun_test
+          POSTGRES_DB: moon_test
         ports:
           - 5432:5432
         options: >-
@@ -47,19 +47,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm --filter @moon.fun/backend run db:generate
+        run: pnpm --filter @Moon/backend run db:generate
 
       - name: Push database schema
-        run: pnpm --filter @moon.fun/backend exec prisma db push --force-reset
+        run: pnpm --filter @Moon/backend exec prisma db push --force-reset
 
       - name: Typecheck
         run: pnpm run -r typecheck
 
       - name: Lint
-        run: pnpm run -r --filter '!@moon.fun/contracts' lint
+        run: pnpm run -r --filter '!@Moon/contracts' lint
 
       - name: Test
-        run: pnpm run -r --filter '!@moon.fun/contracts' test
+        run: pnpm run -r --filter '!@Moon/contracts' test
 
   contracts:
     name: Contracts
@@ -127,7 +127,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AUTH_JWT_SECRET: e2e-test-secret-e2e-test-secret-1234567890
-      DB_URL: postgresql://postgres:postgres@localhost:5432/moonfun_test
+      DB_URL: postgresql://postgres:postgres@localhost:5432/moon_test
       NODE_ENV: test
       CHAIN_ETHEREUM_SEPOLIA_RPC_URL: https://sepolia.drpc.org
       CHAIN_FACTORY_ETHEREUM_SEPOLIA: "0xC3DadD2643a6aB9857880EF7Bf208dEdd31937b3"
@@ -149,7 +149,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: moonfun_test
+          POSTGRES_DB: moon_test
         ports:
           - 5432:5432
         options: >-
@@ -173,10 +173,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm --filter @moon.fun/backend run db:generate
+        run: pnpm --filter @Moon/backend run db:generate
 
       - name: Push database schema
-        run: pnpm --filter @moon.fun/backend exec prisma db push --force-reset
+        run: pnpm --filter @Moon/backend exec prisma db push --force-reset
 
       - name: Start backend
         run: |
@@ -214,10 +214,10 @@ jobs:
           exit 1
 
       - name: Build frontend
-        run: pnpm --filter @moon.fun/frontend run build
+        run: pnpm --filter @Moon/frontend run build
 
       - name: Run Playwright tests
-        run: pnpm --filter @moon.fun/frontend exec playwright install --with-deps chromium && pnpm --filter @moon.fun/frontend run test:e2e
+        run: pnpm --filter @Moon/frontend exec playwright install --with-deps chromium && pnpm --filter @Moon/frontend run test:e2e
 
       - name: Upload Playwright report
         if: always()
