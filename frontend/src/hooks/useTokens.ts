@@ -155,7 +155,7 @@ async function fetchTokensOnChain(filterChainId?: number): Promise<TokenListItem
 
       // 3. Fallback: read allTokens(i) + fetch metadata per token
       if (!eventSuccess) {
-        const maxRead = Math.min(Number(length), 50);
+        const maxRead = Math.min(Number(length), 200);
         const tokenAddresses: string[] = [];
         for (let i = Number(length) - 1; i >= Math.max(0, Number(length) - maxRead); i--) {
           try {
