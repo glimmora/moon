@@ -279,11 +279,6 @@ export function TradePanel({ chainId, curveAddress, tokenAddress, tokenSymbol }:
                   ) : maxBalance !== undefined ? (
                     <span>
                       Bal: {formatCompactToken(maxBalance)} {tokenSymbol}
-                      {nativeBalance !== undefined && (
-                        <span className="ml-1 text-neutral-600">
-                          / {formatEther(nativeBalance.value)} ETH
-                        </span>
-                      )}
                     </span>
                   ) : null}
               </span>
