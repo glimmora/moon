@@ -8,11 +8,13 @@ import { ErrorState } from "@/components/feedback/ErrorState";
 import { ViewToggle } from "@/components/ui/ViewToggle";
 import { Pagination } from "@/components/ui/Pagination";
 import { useListPrefs } from "@/hooks/useListPrefs";
+import { useSelectedChainId } from "@/stores/networkMode";
 import { useEffect, useMemo, useState } from "react";
 
 export function Watchlist() {
   const { data: watched } = useWatchlist();
-  const { data: tokens, isLoading, isError, error, refetch } = useTokens();
+  const selectedChainId = useSelectedChainId();
+  const { data: tokens, isLoading, isError, error, refetch } = useTokens({ chainId: selectedChainId });
   const { view, setView, pageSize, setPageSize } = useListPrefs();
   const [page, setPage] = useState(1);
 

@@ -8,11 +8,15 @@ interface NetworkModeContextValue {
   toggle: () => void;
   /** The default chain ID for the current mode (first active chain). */
   defaultChainId: number;
+  /** The chain the token lists are currently filtered to. Always within activeChainIds. */
+  selectedChainId: number;
+  setSelectedChainId: (id: number) => void;
 }
 
 const NetworkModeContext = createContext<NetworkModeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "Moon.networkMode";
+const SELECTED_CHAIN_KEY = "Moon.selectedChainId";
 
 function safeRead<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -37,12 +41,28 @@ export function NetworkModeProvider({ children }: { children: ReactNode }) {
     safeRead<NetworkMode>(STORAGE_KEY, "testnet"),
   );
 
+  const [selectedChainRaw, setSelectedChainRaw] = useState<number>(() => {
+    const stored = Number(safeRead<string>(SELECTED_CHAIN_KEY, ""));
+    return Number.isInteger(stored) && stored > 0 ? stored : 0;
+  });
+
   const setMode = (m: NetworkMode) => {
     setModeState(m);
     safeWrite(STORAGE_KEY, m);
+    // Keep the selected chain valid for the new mode.
+    const ids = getActiveChainIds(m);
+    if (!ids.includes(selectedChainRaw)) {
+      setSelectedChainRaw(ids[0]);
+      safeWrite(SELECTED_CHAIN_KEY, String(ids[0]));
+    }
   };
 
   const toggle = () => setMode(mode === "mainnet" ? "testnet" : "mainnet");
+
+  const setSelectedChainId = (id: number) => {
+    setSelectedChainRaw(id);
+    safeWrite(SELECTED_CHAIN_KEY, String(id));
+  };
 
   useEffect(() => {
     document.documentElement.dataset.networkMode = mode;
@@ -50,12 +70,18 @@ export function NetworkModeProvider({ children }: { children: ReactNode }) {
 
   const activeChainIds = getActiveChainIds(mode);
   const defaultChainId = activeChainIds[0];
+  // Sanitize: the selected chain must belong to the current mode.
+  const selectedChainId = activeChainIds.includes(selectedChainRaw)
+    ? selectedChainRaw
+    : defaultChainId;
 
   const value: NetworkModeContextValue = {
     mode,
     setMode,
     activeChainIds,
     defaultChainId,
+    selectedChainId,
+    setSelectedChainId,
     toggle,
   };
 
@@ -67,4 +93,10 @@ export function useNetworkMode(): NetworkModeContextValue {
   const ctx = useContext(NetworkModeContext);
   if (!ctx) throw new Error("useNetworkMode must be used within NetworkModeProvider");
   return ctx;
+}
+
+/** The chain the token lists are currently filtered to (validated for the active mode). */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useSelectedChainId(): number {
+  return useNetworkMode().selectedChainId;
 }

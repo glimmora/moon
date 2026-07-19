@@ -2,9 +2,9 @@ import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTokens } from "@/hooks/useTokens";
 import { useSearch } from "@/hooks/useSearch";
+import { useSelectedChainId } from "@/stores/networkMode";
 import { TokenCard } from "@/components/tokens/TokenCard";
 import { TokenRow } from "@/components/tokens/TokenRow";
-import { chainMeta } from "@/config/chains";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ErrorState } from "@/components/feedback/ErrorState";
@@ -16,13 +16,13 @@ const TIERS = ["All", "1B", "10B", "100B"] as const;
 const CURVES = ["All", "Linear", "Exponential", "Logarithmic"] as const;
 
 export function Advanced() {
-  const { data, isLoading, isError, error, refetch } = useTokens();
+  const selectedChainId = useSelectedChainId();
+  const { data, isLoading, isError, error, refetch } = useTokens({ chainId: selectedChainId });
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") ?? "";
   const [query, setQuery] = useState(initialQuery);
   const [tier, setTier] = useState<(typeof TIERS)[number]>("All");
   const [curve, setCurve] = useState<(typeof CURVES)[number]>("All");
-  const [chainFilter, setChainFilter] = useState<number | "all">("all");
   const { view, setView, pageSize, setPageSize } = useListPrefs();
   const [page, setPage] = useState(1);
   const { results: backendResults, isSearching, isBackendSearch } = useSearch(query);
@@ -33,7 +33,7 @@ export function Advanced() {
 
   useEffect(() => {
     setPage(1);
-  }, [query, tier, curve, chainFilter, pageSize]);
+  }, [query, tier, curve, selectedChainId, pageSize]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -64,10 +64,12 @@ export function Advanced() {
         return false;
       if (tier !== "All" && t.supplyTier !== TIERS.indexOf(tier) - 1) return false;
       if (curve !== "All" && t.curveShape !== CURVES.indexOf(curve) - 1) return false;
-      if (chainFilter !== "all" && t.chainId !== chainFilter) return false;
+      // Locked to the selected chain (the backend already filters, but the backend
+      // search union may include other chains — filter them out here too).
+      if (t.chainId !== selectedChainId) return false;
       return true;
     });
-  }, [data, backendResults, isBackendSearch, query, tier, curve, chainFilter]);
+  }, [data, backendResults, isBackendSearch, query, tier, curve, selectedChainId]);
 
   const paged = useMemo(
     () => filtered.slice((page - 1) * pageSize, page * pageSize),
@@ -111,22 +113,9 @@ export function Advanced() {
           )}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <FilterGroup label="Supply Tier" options={TIERS as unknown as string[]} value={tier} onChange={(v) => setTier(v as typeof tier)} />
           <FilterGroup label="Curve" options={CURVES as unknown as string[]} value={curve} onChange={(v) => setCurve(v as typeof curve)} />
-          <div>
-            <label className="mb-1.5 block text-xs text-neutral-400 font-medium">Chain</label>
-            <select
-              value={chainFilter}
-              onChange={(e) => setChainFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
-              className="input"
-            >
-              <option value="all">All Chains</option>
-              {Object.entries(chainMeta).map(([id, m]) => (
-                <option key={id} value={id}>{m.label}</option>
-              ))}
-            </select>
-          </div>
         </div>
       </div>
 

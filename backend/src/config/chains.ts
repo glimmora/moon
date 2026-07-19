@@ -82,6 +82,16 @@ export const chainConfigs: ChainConfig[] = [
     nativeSymbol: "ETH",
     isTestnet: true,
   },
+  {
+    chainId: 91342,
+    label: "Giwa Sepolia",
+    shortLabel: "Giwa-S",
+    explorer: "https://sepolia-explorer.giwa.io",
+    rpcUrl: env.CHAIN_GIWA_SEPOLIA_RPC_URL,
+    factoryAddress: env.CHAIN_FACTORY_GIWA_SEPOLIA,
+    nativeSymbol: "ETH",
+    isTestnet: true,
+  },
 ];
 
 export const SUPPORTED_CHAIN_IDS = new Set(chainConfigs.map((c) => c.chainId));

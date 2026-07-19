@@ -94,6 +94,15 @@ export const contracts: Record<number, ChainContracts> = {
     v3Concentrator: addr("CHAIN_V3_CONCENTRATOR_ETHEREUM_SEPOLIA"),
     moonToken: addr("CHAIN_MOON_TOKEN_ETHEREUM_SEPOLIA"),
   },
+  91342: {
+    factory: addr("CHAIN_FACTORY_GIWA_SEPOLIA"),
+    feeRouter: addr("CHAIN_FEE_ROUTER_GIWA_SEPOLIA"),
+    creatorFeeVault: addr("CHAIN_CREATOR_FEE_VAULT_GIWA_SEPOLIA"),
+    referralRegistry: addr("CHAIN_REFERRAL_REGISTRY_GIWA_SEPOLIA"),
+    moonBurner: addr("CHAIN_MOON_BURNER_GIWA_SEPOLIA"),
+    v3Concentrator: addr("CHAIN_V3_CONCENTRATOR_GIWA_SEPOLIA"),
+    moonToken: addr("CHAIN_MOON_TOKEN_GIWA_SEPOLIA"),
+  },
 };
 
 export function getContracts(chainId: number): ChainContracts | undefined {

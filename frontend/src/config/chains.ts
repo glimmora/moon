@@ -154,6 +154,19 @@ const ETHEREUM_SEPOLIA = {
   testnet: true,
 } satisfies Chain;
 
+const GIWA_SEPOLIA = {
+  id: 91342,
+  name: "Giwa Sepolia",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: {
+      http: rpcs(import.meta.env.CHAIN_GIWA_SEPOLIA_RPC_URL, "https://sepolia-rpc.giwa.io"),
+    },
+  },
+  blockExplorers: { default: { name: "Blockscout", url: "https://sepolia-explorer.giwa.io" } },
+  testnet: true,
+} satisfies Chain;
+
 export const chainMeta: Record<number, ChainMeta> = {
   56: {
     label: "BNB Smart Chain",
@@ -212,6 +225,15 @@ export const chainMeta: Record<number, ChainMeta> = {
     rpcEnv: "CHAIN_ETHEREUM_SEPOLIA_RPC_URL",
     isTestnet: true,
   },
+  91342: {
+    label: "Giwa Sepolia",
+    shortLabel: "Giwa-S",
+    explorer: "https://sepolia-explorer.giwa.io",
+    explorerApi: "https://sepolia-explorer.giwa.io/api",
+    nativeSymbol: "ETH",
+    rpcEnv: "CHAIN_GIWA_SEPOLIA_RPC_URL",
+    isTestnet: true,
+  },
 };
 
 export const moonChains: Chain[] = [
@@ -222,10 +244,11 @@ export const moonChains: Chain[] = [
   BASE_SEPOLIA,
   ARBITRUM_SEPOLIA,
   ETHEREUM_SEPOLIA,
+  GIWA_SEPOLIA,
 ];
 
 export const MAINNET_CHAIN_IDS = [56, 8453, 42161];
-export const TESTNET_CHAIN_IDS = [97, 84532, 421614, 11155111];
+export const TESTNET_CHAIN_IDS = [97, 84532, 421614, 11155111, 91342];
 
 export function getActiveChainIds(mode: NetworkMode): number[] {
   return mode === "mainnet" ? MAINNET_CHAIN_IDS : TESTNET_CHAIN_IDS;

@@ -4,9 +4,11 @@ import { TokenFeed } from "@/components/tokens/TokenFeed";
 import { useTokens } from "@/hooks/useTokens";
 import { chainMeta } from "@/config/chains";
 import { formatUsd } from "@/lib/format";
+import { useSelectedChainId } from "@/stores/networkMode";
 
 export function Home() {
-  const { data: tokens, isLoading } = useTokens();
+  const selectedChainId = useSelectedChainId();
+  const { data: tokens, isLoading } = useTokens({ chainId: selectedChainId });
 
   // Live protocol stats derived from the indexed token list.
   const chainCount = Object.keys(chainMeta).length;

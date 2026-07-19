@@ -283,7 +283,7 @@ export function Header() {
 
 /* ── Network + Chain Selector Dropdown ────────────────────────────── */
 function NetworkDropdown() {
-  const { mode, toggle: toggleMode, activeChainIds } = useNetworkMode();
+  const { mode, toggle: toggleMode, activeChainIds, selectedChainId, setSelectedChainId } = useNetworkMode();
   const { theme } = useTheme();
   const walletChainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
@@ -306,18 +306,21 @@ function NetworkDropdown() {
     };
   }, []);
 
-  // Find the current chain metadata
-  const currentMeta = walletChainId ? chainMeta[walletChainId] : undefined;
+  // Find the current chain metadata (the chain the token lists are filtered to).
+  const currentMeta = chainMeta[selectedChainId];
   const isTestnet = mode === "testnet";
 
   async function selectChain(chainId: number) {
     setOpen(false);
-    if (!address) return; // just close if not connected
-    if (walletChainId === chainId) return;
-    try {
-      await switchChainAsync({ chainId });
-    } catch {
-      // user rejected — ignore
+    // Always update the app-level selected chain (works without a wallet).
+    setSelectedChainId(chainId);
+    // If a wallet is connected on a different chain, also switch it (best-effort).
+    if (address && walletChainId !== chainId) {
+      try {
+        await switchChainAsync({ chainId });
+      } catch {
+        // user rejected — the list filter still follows the selected chain.
+      }
     }
   }
 
@@ -401,7 +404,7 @@ function NetworkDropdown() {
             {activeChainIds.map((id) => {
               const meta = chainMeta[id];
               if (!meta) return null;
-              const isActive = walletChainId === id;
+              const isActive = selectedChainId === id;
               return (
                 <button
                   key={id}

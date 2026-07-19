@@ -180,3 +180,10 @@ contract DeployEthereumSepolia is DeployScript {
         _save(d, "ethereum-sepolia");
     }
 }
+
+contract DeployGiwaSepolia is DeployScript {
+    function run() external returns (Deployed memory d) {
+        d = _deploy();
+        _save(d, "giwa-sepolia");
+    }
+}

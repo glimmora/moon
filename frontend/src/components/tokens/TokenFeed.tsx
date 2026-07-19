@@ -1,7 +1,7 @@
 import { useTokens } from "@/hooks/useTokens";
 import { TokenCard } from "./TokenCard";
 import { TokenRow } from "./TokenRow";
-import { useNetworkMode } from "@/stores/networkMode";
+import { useNetworkMode, useSelectedChainId } from "@/stores/networkMode";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
 import { useEffect, useMemo, useState } from "react";
 import { Flame, Clock, TrendingUp, Crown, WifiOff, Rocket } from "lucide-react";
@@ -26,6 +26,7 @@ const feedTabs = [
 
 export function TokenFeed() {
   const { mode } = useNetworkMode();
+  const selectedChainId = useSelectedChainId();
   const { isOnline } = useBackendHealth();
   const { theme } = useTheme();
   const isLight = theme === "light";
@@ -33,8 +34,9 @@ export function TokenFeed() {
   const { view, setView, pageSize, setPageSize } = useListPrefs();
   const [page, setPage] = useState(1);
 
-  // useTokens now auto-falls back to on-chain reads if backend is offline
-  const { data, isLoading, isError } = useTokens();
+  // useTokens now auto-falls back to on-chain reads if backend is offline.
+  // Filtered to the chain the user has selected in the header.
+  const { data, isLoading, isError } = useTokens({ chainId: selectedChainId });
 
   const sorted = useMemo(() => {
     if (!data) return [];
@@ -115,7 +117,11 @@ export function TokenFeed() {
       {/* Tabs + grid */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-lg font-semibold font-display">
-          {mode === "mainnet" ? "Live Tokens" : "Testnet Tokens"}
+          {chainMeta[selectedChainId]?.label
+            ? `${chainMeta[selectedChainId].label} Tokens`
+            : mode === "mainnet"
+              ? "Live Tokens"
+              : "Testnet Tokens"}
         </h2>
         <div className="flex items-center gap-2">
           <ViewToggle value={view} onChange={setView} />

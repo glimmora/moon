@@ -29,6 +29,7 @@ const schema = z.object({
   CHAIN_BASE_SEPOLIA_RPC_URL: z.string().url().default("https://sepolia.base.org"),
   CHAIN_ARBITRUM_SEPOLIA_RPC_URL: z.string().url().default("https://sepolia-arbitrum.api.onrender.com"),
   CHAIN_ETHEREUM_SEPOLIA_RPC_URL: z.string().url().default("https://ethereum-sepolia-rpc.publicnode.com"),
+  CHAIN_GIWA_SEPOLIA_RPC_URL: z.string().url().default("https://sepolia-rpc.giwa.io"),
 
   // ── Chain factory addresses (CHAIN_ prefix) ──
   // Optional (indexer only starts for configured chains).
@@ -39,6 +40,7 @@ const schema = z.object({
   CHAIN_FACTORY_BASE_SEPOLIA: z.string().optional(),
   CHAIN_FACTORY_ARBITRUM_SEPOLIA: z.string().optional(),
   CHAIN_FACTORY_ETHEREUM_SEPOLIA: z.string().optional(),
+  CHAIN_FACTORY_GIWA_SEPOLIA: z.string().optional(),
 
   // ── Wallet addresses (WALLET_ prefix) ──
   // Used for fee-routing metadata on indexed events.
