@@ -43,17 +43,22 @@ export function NetworkModeProvider({ children }: { children: ReactNode }) {
 
   const [selectedChainRaw, setSelectedChainRaw] = useState<number>(() => {
     const stored = Number(safeRead<string>(SELECTED_CHAIN_KEY, ""));
-    return Number.isInteger(stored) && stored > 0 ? stored : 0;
+    if (Number.isInteger(stored) && stored > 0) return stored;
+    // Default to a populated testnet (Eth Sepolia) so the home feed isn't empty
+    // before the user picks a chain.
+    const ids = getActiveChainIds(safeRead<NetworkMode>(STORAGE_KEY, "testnet"));
+    return ids.includes(11155111) ? 11155111 : ids[0];
   });
 
   const setMode = (m: NetworkMode) => {
     setModeState(m);
     safeWrite(STORAGE_KEY, m);
-    // Keep the selected chain valid for the new mode.
+    // Keep the selected chain valid (and populated) for the new mode.
     const ids = getActiveChainIds(m);
+    const preferred = m === "testnet" && ids.includes(11155111) ? 11155111 : ids[0];
     if (!ids.includes(selectedChainRaw)) {
-      setSelectedChainRaw(ids[0]);
-      safeWrite(SELECTED_CHAIN_KEY, String(ids[0]));
+      setSelectedChainRaw(preferred);
+      safeWrite(SELECTED_CHAIN_KEY, String(preferred));
     }
   };
 

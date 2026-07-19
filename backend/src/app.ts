@@ -38,6 +38,12 @@ export function createApp(): express.Express {
   app.use(compression());
   app.use(pinoHttp({ logger }));
   app.set("trust proxy", 1);
+  // Serialize BigInt (e.g. Prisma `creationBlock`) as strings instead of throwing
+  // "Do not know how to serialize a BigInt" — otherwise any token row with a
+  // creationBlock would 500 the whole response.
+  app.set("json replacer", (_key: string, value: unknown) =>
+    typeof value === "bigint" ? value.toString() : value,
+  );
   app.use(cors({ origin: corsOrigin }));
   app.use(express.json({ limit: "100kb" }));
 
