@@ -22,6 +22,7 @@ interface IMoonFactory {
     error InvalidSupplyTier();
     error InvalidCurveShape();
     error NotAuthorized();
+    error InvalidGraduationFraction();
 
     /* ─────────────────────────  Structs  ──────────────────────── */
 
@@ -59,6 +60,7 @@ interface IMoonFactory {
     event DexRouterUpdated(address indexed oldRouter, address indexed newRouter);
     event MoonTokenUpdated(address indexed oldToken, address indexed newToken);
     event V3ConcentratorUpdated(address indexed oldConc, address indexed newConc);
+    event GraduationFractionUpdated(uint256 oldFractionWad, uint256 newFractionWad);
 
     /* ─────────────────────────  Create  ───────────────────────── */
 

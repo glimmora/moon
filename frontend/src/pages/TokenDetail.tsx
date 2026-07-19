@@ -6,7 +6,10 @@ import { PriceChart } from "@/components/chart/PriceChart";
 import { HolderTable } from "@/components/holders/HolderTable";
 import { Bubblemap } from "@/components/holders/Bubblemap";
 import { chainMeta } from "@/config/chains";
-import { formatMarketCap, shortenAddress, timeAgo, formatToken, graduationProgress, formatPrice, formatPriceUsd } from "@/lib/format";
+import { formatMarketCap, shortenAddress, timeAgo, formatToken, graduationProgress, graduationProgressByReserves, formatPrice, formatPriceUsd } from "@/lib/format";
+import { useReadContracts } from "wagmi";
+import { bondingCurveAbi } from "@/abi/BondingCurve";
+import { formatTokenAmountCompact } from "@/lib/format";
 import { ArrowLeft, ExternalLink, Flame, Loader2, LineChart, Users, Share2, SearchX } from "lucide-react";
 import { Link } from "react-router-dom";
 import { isAddress, type Address } from "viem";
@@ -29,6 +32,23 @@ export function TokenDetail() {
 
   const meta_ = chainMeta[chainId];
   const data = meta.data;
+
+  // Accurate graduation state straight from the curve: tokens sold vs the on-chain threshold.
+  // This is correct on both mainnet and testnet (where the threshold is a tiny fraction).
+  const curveAddress = data?.curve as Address | undefined;
+  const gradReads = useReadContracts({
+    contracts: [
+      { abi: bondingCurveAbi, address: curveAddress, functionName: "s_realTokenReserves", chainId },
+      { abi: bondingCurveAbi, address: curveAddress, functionName: "s_realReservesInit", chainId },
+    ],
+    query: { enabled: Boolean(curveAddress), refetchInterval: 10_000 },
+  });
+  const realTokenReserves = gradReads.data?.[0]?.result as bigint | undefined;
+  const realReservesInit = gradReads.data?.[1]?.result as bigint | undefined;
+  const hasOnChainGrad =
+    typeof realTokenReserves === "bigint" &&
+    typeof realReservesInit === "bigint" &&
+    realReservesInit > 0n;
 
   // Auto-retry for unindexed tokens (backend 404 but address is valid).
   // Polls every 3s for ~120s to cover the backend confirmation lag before a
@@ -204,7 +224,11 @@ export function TokenDetail() {
             <div className="flex-1 min-w-0">
               <p className="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-2">Graduation Progress</p>
               <LaunchCountdown
-                progress={graduationProgress(data.volume24h, data.supplyTier)}
+                progress={
+                  hasOnChainGrad
+                    ? graduationProgressByReserves(realTokenReserves!, realReservesInit!)
+                    : graduationProgress(data.volume24h, data.supplyTier)
+                }
                 graduated={data.graduated}
                 createdAt={data.createdAt}
                 volume24h={data.volume24h}
@@ -215,7 +239,10 @@ export function TokenDetail() {
             <div className="text-sm">
               <p className="text-xs text-[var(--text-muted)]">Threshold</p>
               <p className="font-semibold tabular">
-                {["793.1M", "7.93B", "79.3B"][data.supplyTier] ?? "-"} tokens
+                {hasOnChainGrad
+                  ? formatTokenAmountCompact(realReservesInit!)
+                  : (["793.1M", "7.93B", "79.3B"][data.supplyTier] ?? "-")}{" "}
+                tokens
               </p>
               <p className="text-[10px] text-[var(--text-muted)] mt-0.5">then auto-graduation to DEX</p>
             </div>

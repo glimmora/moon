@@ -80,7 +80,7 @@ contract BondingCurve is ReentrancyGuard, IBondingCurve {
     uint256 public s_totalSupplyInit;
 
     /// @dev Real token reserves at init (graduation threshold reference).
-    uint256 private s_realReservesInit;
+    uint256 public s_realReservesInit;
 
     /// @dev The curve shape for this clone.
     uint8 private s_curveShape;

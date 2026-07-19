@@ -71,6 +71,7 @@ export const bondingCurveAbi = [
   { type: "function", name: "s_virtualTokenReserves", inputs: [], outputs: [{ name: "", type: "uint256" }], stateMutability: "view" },
   { type: "function", name: "s_virtualQuoteReserves", inputs: [], outputs: [{ name: "", type: "uint256" }], stateMutability: "view" },
   { type: "function", name: "s_totalSupplyInit", inputs: [], outputs: [{ name: "", type: "uint256" }], stateMutability: "view" },
+  { type: "function", name: "s_realReservesInit", inputs: [], outputs: [{ name: "", type: "uint256" }], stateMutability: "view" },
   {
     type: "event",
     name: "Bought",

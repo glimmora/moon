@@ -55,6 +55,11 @@ contract MoonFactory is AccessControl, IMoonFactory {
     address public moonToken; // $MOON governance token (optional, for buyback)
     address public dexRouter; // AUDIT-FIX H1: Uniswap V2 router used to seed LP at graduation
 
+    /// @notice Graduation threshold as a fraction of the tier's total supply, in WAD (1e18 = 100%).
+    /// @dev 0 = disabled → use the default curve threshold (realReservesForTier). Testnet may set
+    ///      this to a tiny value (e.g. 1e13 = 0.001%) so tokens graduate almost immediately.
+    uint256 public graduationFractionWad;
+
     address public moonTokenImpl;
     address public bondingCurveImpl;
 
@@ -117,7 +122,15 @@ contract MoonFactory is AccessControl, IMoonFactory {
 
         // Compute reserves for the tier + curve.
         uint256 totalSupplyInit = totalSupplyForTier(params.supplyTier);
-        uint256 realTokenReservesInit = realReservesForTier(params.supplyTier);
+        // Graduation threshold: default curve threshold, or a configured fraction of total supply
+        // (used on testnet so tokens graduate almost immediately). Must stay within (0, totalSupply)
+        // so reservedForLP = totalSupplyInit - realReservesInit > 0 at graduation.
+        uint256 realTokenReservesInit = graduationFractionWad == 0
+            ? realReservesForTier(params.supplyTier)
+            : (totalSupplyInit * graduationFractionWad) / 1e18;
+        if (realTokenReservesInit == 0 || realTokenReservesInit >= totalSupplyInit) {
+            revert InvalidGraduationFraction();
+        }
         uint256 virtualTokenReservesInit =
             _virtualTokenReserves(params.curveShape, params.supplyTier);
         uint256 virtualQuoteReservesInit =
@@ -291,6 +304,15 @@ contract MoonFactory is AccessControl, IMoonFactory {
     function setDexRouter(address dexRouter_) external onlyRole(ADMIN_ROLE) {
         emit DexRouterUpdated(dexRouter, dexRouter_);
         dexRouter = dexRouter_;
+    }
+
+    /// @notice Set the graduation threshold as a fraction of total supply (WAD, 1e18 = 100%).
+    /// @dev Applies to tokens created AFTER this call. 0 restores the default curve threshold.
+    ///      Must be < 1e18 so some supply is always reserved for LP at graduation.
+    function setGraduationFraction(uint256 fractionWad) external onlyRole(ADMIN_ROLE) {
+        if (fractionWad >= 1e18) revert InvalidGraduationFraction();
+        emit GraduationFractionUpdated(graduationFractionWad, fractionWad);
+        graduationFractionWad = fractionWad;
     }
 
     /// @notice Update the V3 concentrator address (currently a safe stub). address(0) disables

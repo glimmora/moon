@@ -46,6 +46,9 @@ abstract contract DeployScript is Script {
         address moonTokenGov = vm.envOr("CHAIN_MOON_TOKEN_ETHEREUM_SEPOLIA", treasury);
         // AUDIT-FIX H1: optional Uniswap V2 router for graduation LP seeding (0 = disabled).
         address dexRouter = vm.envOr("DEX_ROUTER", address(0));
+        // Optional graduation threshold as a fraction of total supply, in WAD (1e18 = 100%).
+        // 0 = default curve threshold (mainnet). Testnet e.g. 1e13 = 0.001% for fast graduation.
+        uint256 graduationFractionWad = vm.envOr("GRADUATION_FRACTION_WAD", uint256(0));
 
         vm.startBroadcast(deployer);
 
@@ -92,6 +95,11 @@ abstract contract DeployScript is Script {
         if (dexRouter != address(0)) {
             MoonFactory(d.factory).setDexRouter(dexRouter);
             MoonBurner(payable(d.moonBurner)).setDexRouter(dexRouter);
+        }
+
+        // Configure a testnet-style graduation threshold when provided (0 keeps the default).
+        if (graduationFractionWad != 0) {
+            MoonFactory(d.factory).setGraduationFraction(graduationFractionWad);
         }
 
         vm.stopBroadcast();

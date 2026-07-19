@@ -115,6 +115,17 @@ export function formatNumber(n: number): string {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
+/** Abbreviate a whole-token (1e18) amount as e.g. "10K", "793.1M", "79.3B". */
+export function formatTokenAmountCompact(amount: bigint, decimals = 18): string {
+  if (amount <= 0n) return "0";
+  const whole = amount / 10n ** BigInt(decimals);
+  const n = Number(whole);
+  if (n < 1000) return n.toLocaleString("en-US");
+  if (n < 1_000_000) return `${(n / 1000).toFixed(1)}K`;
+  if (n < 1_000_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  return `${(n / 1_000_000_000).toFixed(1)}B`;
+}
+
 export function formatCompact(n: number): string {
   if (n === 0) return "0";
   if (Math.abs(n) < 0.001) return n.toExponential(2);
@@ -127,4 +138,21 @@ export function graduationProgress(volume24h: number, supplyTier: number): numbe
   if (threshold <= 0) return 0;
   // Report true progress (no artificial floor) so a token with no volume reads 0%.
   return Math.min(100, Math.max(0, (volume24h / threshold) * 100));
+}
+
+/**
+ * Accurate graduation progress from on-chain reserves: tokens sold on the curve
+ * (realTokenReserves) vs the graduation threshold (realReservesInit). This mirrors the
+ * exact on-chain condition `s_realTokenReserves >= s_realReservesInit`, so it stays correct
+ * even on testnet where the threshold is a tiny fraction of total supply.
+ */
+export function graduationProgressByReserves(
+  realTokenReserves: bigint,
+  realReservesInit: bigint,
+): number {
+  if (realReservesInit <= 0n) return 0;
+  const clamped = realTokenReserves > realReservesInit ? realReservesInit : realTokenReserves;
+  // Scale in bigint to keep precision, then convert to a 0..100 number.
+  const bps = (clamped * 10000n) / realReservesInit;
+  return Math.min(100, Math.max(0, Number(bps) / 100));
 }

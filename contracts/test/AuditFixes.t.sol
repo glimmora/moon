@@ -349,6 +349,48 @@ contract AuditFixesTest is Test {
 
     /* ─────────────────────────  helpers  ────────────────────── */
 
+    /* ──────────────────  Graduation fraction (testnet)  ────────────────── */
+
+    /// @notice A configured graduation fraction lowers s_realReservesInit to a fraction of
+    ///         the tier's total supply, without touching the virtual reserves (price curve).
+    function test_GraduationFraction_LowersThreshold() public {
+        // 0.001% of total supply.
+        uint256 fractionWad = 1e13;
+        vm.prank(deployer);
+        factory.setGraduationFraction(fractionWad);
+        assertEq(factory.graduationFractionWad(), fractionWad, "fraction stored");
+
+        (, address curveAddr) = _createToken(0, 1);
+        BondingCurve curve = BondingCurve(payable(curveAddr));
+
+        uint256 totalSupply = factory.totalSupplyForTier(0);
+        uint256 expected = (totalSupply * fractionWad) / 1e18;
+        assertEq(curve.s_realReservesInit(), expected, "threshold = 0.001% of supply");
+        assertLt(
+            curve.s_realReservesInit(),
+            factory.realReservesForTier(0),
+            "threshold far below default curve threshold"
+        );
+    }
+
+    /// @notice Zero fraction restores the default curve threshold.
+    function test_GraduationFraction_ZeroUsesDefault() public {
+        (, address curveAddr) = _createToken(0, 1);
+        BondingCurve curve = BondingCurve(payable(curveAddr));
+        assertEq(
+            curve.s_realReservesInit(),
+            factory.realReservesForTier(0),
+            "default threshold when fraction unset"
+        );
+    }
+
+    /// @notice A fraction of 100% or more is rejected (must reserve some supply for LP).
+    function test_GraduationFraction_RejectsFullSupply() public {
+        vm.prank(deployer);
+        vm.expectRevert(IMoonFactory.InvalidGraduationFraction.selector);
+        factory.setGraduationFraction(1e18);
+    }
+
     function _createToken(uint8 tier, uint8 curveShape)
         internal
         returns (address token, address curve)
